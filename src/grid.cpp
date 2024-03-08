@@ -14,6 +14,7 @@
 #include <iostream>  // for input and output
 #include <vector>  // for vector
 #include <cstdlib>  // for rand and srand, to generate random numbers
+#include <mpi.h>  // for MPI functions
 
 
 //*****************************************************************************************
@@ -25,7 +26,7 @@
 //******************************************************************************
 // Constructor for the grid
 //******************************************************************************
-Grid::Grid(int size, int seed) : size(size), grid(size, std::vector<int>(size)) {
+Grid::Grid(int size1, int size2, int seed) : size1(size1), size2(size2) {
     /*
         Constructor for the grid to initialize the class's member variables
 
@@ -37,27 +38,70 @@ Grid::Grid(int size, int seed) : size(size), grid(size, std::vector<int>(size)) 
         Returns:
             void
     */
+
+    grid = new int[size1*size2];  // Allocate memory for the grid
+    
     initializeGrid(seed);    // Populate the grid with random binary values
-}
+};
 
 
 //******************************************************************************
-// User input grid initialization
+// Destructor for the grid
 //******************************************************************************
-void Grid::setGrid(const std::vector<std::vector<int>>& initialGrid){
+Grid::~Grid(){
     /*
-        Initializes the grid with the user input, assume the input grid is a square
+        Destructor for the grid to deallocate the memory used by the grid.
+        Automatically called when object of type Grid goes out of scope or is deleted explicitly.
+
+
 
         Args:
-            initialGrid: std::vector<std::vector<int>>, the initial grid provided by the user
+            None
 
         Returns:
             void
     */
 
-    size = initialGrid.size();  // size of the grid
-    grid = initialGrid;  // initialize the grid
-}
+    delete[] grid;  // Deallocate memory for the grid
+};
+
+//******************************************************************************
+// Function to access the elements of the grid (by using 2D index convention) 
+//******************************************************************************
+
+int& Grid::operator()(int row, int col){
+    /*
+        Access the elements of the grid using 2D index convention
+
+        Args:
+            row: int, the row index of the cell
+            col: int, the column index of the cell
+
+        Returns:
+            int&, the value of the cell in the grid
+    */
+
+    return grid[row*size2 + col];
+};
+
+
+
+//******************************************************************************
+// User input grid initialization
+//******************************************************************************
+void Grid::setGrid(const int* initialGrid){
+    /*
+        Initializes the grid with the user input, assume the input grid is a square
+
+        Args:
+            initialGrid: int*, the initial grid provided by the user
+
+        Returns:
+            void
+    */
+
+   memcpy(grid, initialGrid, sizeof(int)*size1*size2);  // Memory copy the user input to the grid
+};
 
 
 //******************************************************************************
@@ -75,42 +119,54 @@ void Grid::updateGrid(){
     */
 
     // Create a new grid to store the updated values after applying the rules of the game
-    std::vector<std::vector<int>> new_grid(size, std::vector<int>(size,0));
+    int* new_grid = new int[size1*size2];  // Allocate memory for the new grid
 
     // Iterate through each cell in the grid
-    for (int row=0; row<size;++row){    // Iterating over rows
-        for (int col=0; col<size;++col){    // Iterating over columns
-            // Counting the number of live neighbors
+    for (int i=0; i<size1;++i){    // Iterating over rows
         
-            int live_neighbors = countLiveNeighbors(row, col);
+
+        for (int j=0; j<size2;++j){    // Iterating over columns
+
+            // Counting the number of live neighbors
+            int live_neighbors = countLiveNeighbors(i, j);
             // The number of alive neighbors has been counted, now apply the rules of the game
+            
+            // Create an index that uses the 2D index convention in accessing 1D array
+            int index = i*size2 + j;
+
+            // Additionally one can use "*this" instead of "grid" to use the operator() for indexing
+            // However, new_grid local variable is not a member of the class, hence requires "index" 
 
             //Rule number1: Under-population
-            if (grid[row][col]==1 && live_neighbors<2){
-                new_grid[row][col] = 0; // the current cell dies
+            if (grid[index]==1 && live_neighbors<2){
+                new_grid[index] = 0; // the current cell dies
             }
             //Rule number2: Over-population
-            else if (grid[row][col]==1 && live_neighbors>3){
-                new_grid[row][col] = 0; // the current cell dies
+            else if (grid[index]==1 && live_neighbors>3){
+                new_grid[index] = 0; // the current cell dies
             }
             //Rule number3: Survival - assuming its alive already
-            else if((live_neighbors==2 || live_neighbors==3) && grid[row][col]==1){
-                new_grid[row][col] = 1; // the current alive cell continues to live on to the next generation 
+            else if((live_neighbors==2 || live_neighbors==3) && grid[index]==1){
+                new_grid[index] = 1; // the current alive cell continues to live on to the next generation 
             }
 
             //Rule number4: Reproduction
-            else if(live_neighbors==3 && grid[row][col]==0){
-                new_grid[row][col] = 1; // the current dead cell becomes alive in the next generation
+            else if(live_neighbors==3 && grid[index]==0){
+                new_grid[index] = 1; // the current dead cell becomes alive in the next generation
             }
             else{
-                new_grid[row][col] = 0; // the current dead cell remains dead
+                new_grid[index] = 0; // the current dead cell remains dead
 
             }
         }
     }
 
-    grid = new_grid;
-}
+    // Deallocate the memory used by the previous grid
+    delete[] grid;  // Deallocate old "grid"
+
+    grid = new_grid;  // Set the grid to the new grid
+};
+
 
 
 //******************************************************************************
@@ -130,17 +186,17 @@ void Grid::printGrid(){
     */
 
     // Iterate through the grid and print the values to the terminal
-    for (int row = 0; row < size; ++row){
-        for (int col = 0; col < size; ++col){
+    for (int row = 0; row < size1; ++row){
+        for (int col = 0; col < size2; ++col){
 
             // Use of ternary operator to print the values
 
-            std::cout << (grid[row][col] ? "o" : ".") << " ";
+            std::cout << ((*this)(row,col) ? "o" : ".") << " ";    // "*this" here is equivalent to "grid" in the main function
         }
         std::cout << std::endl;  // End of each row
     }
 
-}
+};
 
 
 
@@ -150,7 +206,7 @@ void Grid::printGrid(){
 
 
 //******************************************************************************
-// define a function for counting the number of live neighbors
+// Define a function for counting the number of live neighbors
 //******************************************************************************
 int Grid::countLiveNeighbors(int row, int col){
 
@@ -169,21 +225,21 @@ int Grid::countLiveNeighbors(int row, int col){
     int live_neighbors = 0;
 
     // Iterate through the neighbour of the current cell - nested loop
-    for (int x=-1; x<=1; ++x){
-        for (int y=-1; y<=1; ++y){
+    for (int dx=-1; dx<=1; ++dx){
+        for (int dy=-1; dy<=1; ++dy){
         
             // This mini 3x3 grid also includes the current cell which we want to skip
-            if (x==0 && y==0){continue;}
+            if (dx==0 && dy==0){continue;}
 
             // Assuming boundaries are periodic, calculating the coordinates of the neighbors
-            int x_neighbour = ((row + x) + size) % size;    // Adding and taking modulo of size ensures periodic boundaries
-            int y_neighbour = ((col + y) + size) % size;    // Assuming the grid is a square --> size here is the same as the total number of columns
+            int x_neighbour = ((row + dx) + size1) % size1;    // Adding and taking modulo of size ensures periodic boundaries
+            int y_neighbour = ((col + dy) + size2) % size2;    // Assuming the grid is a square --> size1 = size2
 
 
             // For periodic boundaries, no need to check if any of the neighbors are outside the grid
 
             // Neighbour pixel is inside the grid, count the number of live neighbors
-            live_neighbors += grid[x_neighbour][y_neighbour];
+            live_neighbors += (*this)(x_neighbour,y_neighbour);   // "*this" here is equivalent to "grid" in the main function
                     
         }
     }
@@ -191,7 +247,7 @@ int Grid::countLiveNeighbors(int row, int col){
     return live_neighbors;
 
 
-}
+};
 
 
 //******************************************************************************
@@ -207,17 +263,61 @@ void Grid::initializeGrid(int seed){
                 this ensures robustness of the simulation and analysis
 
         Returns:
-            std::vector<std::vector<int> >, the initialized grid
+            2D array, the initialized grid
     */
 
     // Setting the seed for the random number generator
     srand(seed);
 
     // Fill the grid with random binary values
-    for (int i = 0; i < size; ++i){
-        for (int j = 0; j < size; ++j){
-            grid[i][j] = rand() % 2; // modulo 2 ensures that the value is either 0 or 1 (even or odd)
+    for (int i = 0; i < size1; ++i){
+        for (int j = 0; j < size2; ++j){
+            (*this)(i,j) = rand() % 2; // modulo 2 ensures that the value is either 0 or 1 (even or odd)
         }
     }
 }
 
+
+
+//******************************************************************************
+// MPI Function to communicate the boundary cells with the neighboring processes
+//******************************************************************************
+
+void Grid::communicateBoundary(int rank, int nranks){
+    /*
+        Communicates the boundary cells with the neighboring processes
+
+        Args:
+            rank: int, the rank of the current process
+            nranks: int, the number of processes
+
+        Returns:
+            void
+    */
+
+   // 2D Domain decomposition has 8 neighbors
+   // Calculate the rank of the neighboring processes
+
+    int process_grid_size = sqrt(nranks);  // Assuming the number of processes is a perfect square
+    int row = rank / process_grid_size;  // Calculate the row of the current process
+    int col = rank % process_grid_size;  // Calculate the column of the current process
+
+    // Define the ranks of the neighboring processes
+    int top = (row - 1 + process_grid_size) % process_grid_size * process_grid_size + col;
+    int bottom = (row + 1) % process_grid_size * process_grid_size + col;
+    int left = row * process_grid_size + (col - 1 + process_grid_size) % process_grid_size;
+    int right = row * process_grid_size + (col + 1) % process_grid_size;
+    int top_left = (row - 1 + process_grid_size) % process_grid_size * process_grid_size + (col - 1 + process_grid_size) % process_grid_size;
+    int top_right = (row - 1 + process_grid_size) % process_grid_size * process_grid_size + (col + 1) % process_grid_size;
+    int bottom_left = (row + 1) % process_grid_size * process_grid_size + (col - 1 + process_grid_size) % process_grid_size;
+    int bottom_right = (row + 1) % process_grid_size * process_grid_size + (col + 1) % process_grid_size;
+
+
+
+    // Communicate the boundary cells with the neighboring processes
+    // Send the top row to the top neighbor and receive the bottom row from the top neighbor
+    MPI_Sendrecv(&grid[size2], size2, MPI_INT, 
+                top, 0, &grid[(size1-1)*size2], size2, MPI_INT, 
+                bottom, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+}
