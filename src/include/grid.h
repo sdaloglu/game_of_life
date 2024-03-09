@@ -28,7 +28,13 @@ public:
     int& operator()(int row, int col);
 
     // Define a function to communicate the boundary cells with the neighboring processes
-    void communicateBoundaryCells(int rank, int nranks);
+    void communicateBoundary(int rank, int nranks);
+
+    // Define a function to get the pointer to the grid
+    int* getGrid();   
+
+    // Define a function to reorganize 1D grid so that each chunk to be scattered is contiguous in memory
+    void reorganizeGrid(int nranks); 
 
 
 private:
@@ -40,7 +46,7 @@ private:
     int* grid;  // Pointer to a pointer (1D array to represent a 2D array -->by manipulating indices)
 
     // Private helper function to count the number of live neighbors inside the updateGrid function
-    int countLiveNeighbors(int row, int col);
+    int countLiveNeighbors(int row, int co, std::string method);
 
     // Private initializing function for the grid to be called from the constructor
     void initializeGrid(int seed);
