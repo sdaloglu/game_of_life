@@ -66,6 +66,24 @@ Grid::~Grid(){
 };
 
 //******************************************************************************
+// Define a function for getting the pointer to the grid
+//******************************************************************************
+int* Grid::getGrid(){
+    /*
+        Returns the pointer to the grid
+
+        Args:
+            None
+
+        Returns:
+            int*, the pointer to the grid
+    */
+
+    return grid;
+};
+
+
+//******************************************************************************
 // Function to access the elements of the grid (by using 2D index convention) 
 //******************************************************************************
 
@@ -128,7 +146,7 @@ void Grid::updateGrid(){
         for (int j=0; j<size2;++j){    // Iterating over columns
 
             // Counting the number of live neighbors
-            int live_neighbors = countLiveNeighbors(i, j);
+            int live_neighbors = countLiveNeighbors(i, j, "for_loop");
             // The number of alive neighbors has been counted, now apply the rules of the game
             
             // Create an index that uses the 2D index convention in accessing 1D array
@@ -208,7 +226,7 @@ void Grid::printGrid(){
 //******************************************************************************
 // Define a function for counting the number of live neighbors
 //******************************************************************************
-int Grid::countLiveNeighbors(int row, int col){
+int Grid::countLiveNeighbors(int row, int col, std::string method = "for_loop"){
 
     /*
         Counts the number of live neighbors for each cell in the grid
@@ -221,8 +239,12 @@ int Grid::countLiveNeighbors(int row, int col){
             int, the number of live neighbors for each cell in the grid
     */
 
+    //Could use kernel here
+
     // Initialize the number of live neighbors
     int live_neighbors = 0;
+
+    if(method == "for_loop"){
 
     // Iterate through the neighbour of the current cell - nested loop
     for (int dx=-1; dx<=1; ++dx){
@@ -243,10 +265,28 @@ int Grid::countLiveNeighbors(int row, int col){
                     
         }
     }
+    }
 
-    return live_neighbors;
+    else if (method == "kernel"){
+        // Define the kernel for the game of life
+        int kernel[3][3] = {{1,1,1},
+                            {1,0,1},
+                            {1,1,1}};
 
+        // Iterate through the kernel
+        for (int i = 0; i < 3; ++i){
+            for (int j = 0; j < 3; ++j){
+                // Calculate the coordinates of the neighbors
+                int x_neighbour = ((row + i - 1) + size1) % size1;    // Adding and taking modulo of size ensures periodic boundaries
+                int y_neighbour = ((col + j - 1) + size2) % size2;    // Assuming the grid is a square --> size1 = size2
 
+                // Neighbour pixel is inside the grid, count the number of live neighbors
+                live_neighbors += kernel[i][j] * (*this)(x_neighbour,y_neighbour);   // "*this" here is equivalent to "grid" in the main function
+            }
+        }
+    }
+
+return live_neighbors;
 };
 
 
@@ -276,6 +316,58 @@ void Grid::initializeGrid(int seed){
         }
     }
 }
+
+//******************************************************************************
+//  // Define a function to reorganize 1D grid so that each chunk to be scattered is contiguous in memory
+//******************************************************************************
+void Grid::reorganizeGrid(int nranks){
+
+    /*
+        Reorganizes the 1D grid so that each chunk to be scattered is contiguous in memory
+
+        Args:
+            None
+
+        Returns:
+            void
+    */
+
+    // Process grid size
+    int process_grid_size = sqrt(nranks);  // Assuming the number of processes is a perfect square
+   
+    int* new_grid = new int[size1*size2];  // Allocate memory for the new grid
+    int num_rows_subgrid = size1 / process_grid_size;  // Number of rows in each subgrid
+    int num_cols_subgrid = size2 / process_grid_size;  // Number of columns in each subgrid
+
+    // Reorganize the grid so that each chunk to be scattered is contiguous in memory
+
+    for (int subgrid_row = 0; subgrid_row < num_rows_subgrid; ++subgrid_row) {
+        for (int subgrid_col = 0; subgrid_col < num_cols_subgrid; ++subgrid_col) {
+            for (int row = 0; row < process_grid_size; ++row) {
+                for (int col = 0; col < process_grid_size; ++col) {
+                    // Calculate the original row and column of the cell
+                    int original_row = subgrid_row * process_grid_size + row;
+                    int original_col = subgrid_col * process_grid_size + col;
+                    // Calculate the new index of the cell in the new grid
+                    int new_index = (subgrid_row * num_cols_subgrid * process_grid_size * process_grid_size) + 
+                                   (subgrid_col * process_grid_size * process_grid_size) + 
+                                   (row * process_grid_size) + col;
+                    // Calculate the original index of the cell in the old grid
+                    int original_index = original_row * size2 + original_col;
+                    new_grid[new_index] = grid[original_index]; // Copy the value of the cell to the new grid
+                }
+            }
+        }
+    }
+    // Delete the old grid memory
+    delete[] grid;
+
+    // Set the grid to the new grid
+    grid = new_grid;
+    
+
+    
+};
 
 
 
@@ -320,4 +412,48 @@ void Grid::communicateBoundary(int rank, int nranks){
                 top, 0, &grid[(size1-1)*size2], size2, MPI_INT, 
                 bottom, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-}
+    // Send the bottom row to the bottom neighbor and receive the top row from the bottom neighbor
+    MPI_Sendrecv(&grid[(size1-2)*size2], size2, MPI_INT, 
+                bottom, 0, &grid[0], size2, MPI_INT, 
+                top, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    // Send the left column to the left neighbor and receive the right column from the left neighbor
+    for (int i = 0; i < size1; ++i){
+        MPI_Sendrecv(&grid[i*size2 + 1], 1, MPI_INT, 
+                    left, 0, &grid[i*size2 + size2 - 1], 1, MPI_INT, 
+                    right, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    }
+
+    // Send the right column to the right neighbor and receive the left column from the right neighbor
+    for (int i = 0; i < size1; ++i){
+        MPI_Sendrecv(&grid[i*size2 + size2 - 2], 1, MPI_INT, 
+                    right, 0, &grid[i*size2], 1, MPI_INT, 
+                    left, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    }
+
+    // Communicate the corner cells with the neighboring processes
+    MPI_Sendrecv(&grid[1], 1, MPI_INT, 
+                top_left, 0, &grid[size2*size1-1], 1, MPI_INT, 
+                bottom_right, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    MPI_Sendrecv(&grid[size2-2], 1, MPI_INT,
+                top_right, 0, &grid[size2*size1-size2], 1, MPI_INT, 
+                bottom_left, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    MPI_Sendrecv(&grid[size2*size1-size2+1], 1, MPI_INT,    
+                bottom_left, 0, &grid[size2-1], 1, MPI_INT, 
+                top_right, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    MPI_Sendrecv(&grid[size2*size1-2], 1, MPI_INT,  
+                bottom_right, 0, &grid[size2], 1, MPI_INT, 
+                top_left, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);    
+
+    MPI_Barrier(MPI_COMM_WORLD);    // Synchronize all processes
+    
+
+
+};
+
+
+
+//******************************************************************************
