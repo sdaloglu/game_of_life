@@ -1,7 +1,7 @@
 # Make file for CMake Project commands
 
 # Name of the targets
-BUILDS = build release debug clean docs
+BUILDS = build release debug clean docs test
 
 .PHONY := $(BUILDS)
 
