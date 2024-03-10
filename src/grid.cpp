@@ -1,15 +1,19 @@
-/*
-    Contains the implementation of the Grid class
-    The functions defined are:
-
-    initializeGrid: Initializes the grid with random binary values
-    updateGrid: Updates the grid based on the rules of the game
-    printGrid: Prints the grid to the console
-
-
-
+/**
+ * @file grid.cpp
+ * @brief Contains the implementation of the Grid class
+ * The functions defined are:
+ * - initializeGrid: Initializes the grid with random binary values
+ * - updateGrid: Updates the grid based on the rules of the game
+ * - printGrid: Prints the grid to the console
+ * - countLiveNeighbors: Counts the number of live neighbors for each cell in the grid
+ * - reorganizeGrid: Reorganizes the 1D grid so that each chunk to be scattered is contiguous in memory
+ * - communicateBoundary: Communicates the boundary cells with the neighboring processes
+ * - getGrid: Returns the pointer to the grid
+ * - setGrid: Initializes the grid with the user input
+ * - operator(): Access the elements of the grid (by using 2D index convention)
+ * - Grid: Constructor for the grid to initialize the class's member variables
+ * - ~Grid: Destructor for the grid to deallocate the memory used by the grid object
 */
-
 #include "grid.h"
 
 #include <mpi.h>  // for MPI functions
@@ -22,8 +26,7 @@
 //***************************----PUBLIC----************************************************
 //*****************************************************************************************
 
-//******************************************************************************
-//******************************************************************************
+
 /**
  * @brief Constructor for the grid to initialize the class's member variables.
  *
@@ -38,8 +41,9 @@ Grid::Grid(int size1, int size2, int seed) : size1(size1), size2(size2) {
   initializeGrid(seed);  // Populate the grid with random binary values
 };
 
-//******************************************************************************
-//******************************************************************************
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
 /**
  * @brief  Destructor for the grid to deallocate the memory used by the grid
  * object.
@@ -49,79 +53,57 @@ Grid::~Grid() {
   delete[] grid;  // Deallocate memory for the grid
 };
 
-//******************************************************************************
-// Define a function for getting the pointer to the grid
-//******************************************************************************
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @brief Returns the pointer to the grid
+ * 
+ * @return int* The pointer to the grid
+ */
 int* Grid::getGrid() {
-  /*
-      Returns the pointer to the grid
-
-      Args:
-          None
-
-      Returns:
-          int*, the pointer to the grid
-  */
-
   return grid;
 };
 
-//******************************************************************************
-// Function to access the elements of the grid (by using 2D index convention)
-//******************************************************************************
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Access the elements of the grid using 2D index convention
+ * 
+ * @param row int, the row index of the cell
+ * @param col int, the column index of the cell
+ * @return int&, the value of the cell in the grid
+ */
 int& Grid::operator()(int row, int col) {
-  /*
-      Access the elements of the grid using 2D index convention
-
-      Args:
-          row: int, the row index of the cell
-          col: int, the column index of the cell
-
-      Returns:
-          int&, the value of the cell in the grid
-  */
-
   return grid[row * size2 + col];
 };
 
-//******************************************************************************
-// User input grid initialization
-//******************************************************************************
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @brief Initializes the grid with the user input, assumes the input grid is a square
+ * 
+ * @param initialGrid int*, the initial grid provided by the user
+ */
 void Grid::setGrid(const int* initialGrid) {
-  /*
-      Initializes the grid with the user input, assume the input grid is a
-     square
-
-      Args:
-          initialGrid: int*, the initial grid provided by the user
-
-      Returns:
-          void
-  */
-
   memcpy(
       grid, initialGrid,
       sizeof(int) * size1 * size2);  // Memory copy the user input to the grid
 };
 
-//******************************************************************************
-// defining a function to update the grid
-//******************************************************************************
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @brief Updates the grid based on the rules of the game:
+ * - 1. Any live cell with fewer than two live neighbors dies, as if by underpopulation
+ * - 2. Any live cell with more than three live neighbors dies, as if by overpopulation
+ * - 3. Any live cell with two or three live neighbors lives on to the next generation
+ * - 4. Any dead cell with exactly three live neighbors becomes a live cell, as if by reproduction
+ */
 void Grid::updateGrid() {
-  /*
-      Updates the grid based on the rules of the game:
-          - 1. Any live cell with fewer than two live neighbors dies, as if by
-     underpopulation
-          - 2. Any live cell with more than three live neighbors dies, as if by
-     overpopulation
-          - 3. Any live cell with two or three live neighbors lives on to the
-     next generation
-          - 4. Any dead cell with exactly three live neighbors becomes a live
-     cell, as if by reproduction
-
-  */
-
   // Create a new grid to store the updated values after applying the rules of
   // the game
   int* new_grid = new int[size1 * size2];  // Allocate memory for the new grid
@@ -174,22 +156,14 @@ void Grid::updateGrid() {
   grid = new_grid;  // Set the grid to the new grid
 };
 
-//******************************************************************************
-// defining a function to print the grid
-//******************************************************************************
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @brief Prints the grid to the terminal
+ * 
+ */
 void Grid::printGrid() {
-  /*
-      Prints the grid to the terminal
-
-      Args:
-          grid: std::vector<std::vector<int>>, the grid to be printed
-
-      Returns:
-          void
-
-
-  */
-
   // Iterate through the grid and print the values to the terminal
   for (int row = 0; row < size1; ++row) {
     for (int col = 0; col < size2; ++col) {
@@ -207,23 +181,20 @@ void Grid::printGrid() {
 //***************************----PRIVATE----***********************************************
 //*****************************************************************************************
 
-//******************************************************************************
-// Define a function for counting the number of live neighbors
-//******************************************************************************
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @brief Counts the number of live neighbors for each cell in the grid
+ * 
+ * @param row int, the row index of the cell
+ * @param col int, the column index of the cell
+ * @param method std::string, the method to use for counting the number of live neighbors
+ * @return int the number of live neighbors for each cell in the grid
+ */
 int Grid::countLiveNeighbors(int row, int col,
                              std::string method = "for_loop") {
-  /*
-      Counts the number of live neighbors for each cell in the grid
-
-      Args:
-          row: int, the row index of the cell
-          col: int, the column index of the cell
-
-      Returns:
-          int, the number of live neighbors for each cell in the grid
-  */
-
-  // Could use kernel here
+  
 
   // Initialize the number of live neighbors
   int live_neighbors = 0;
@@ -287,22 +258,14 @@ int Grid::countLiveNeighbors(int row, int col,
   return live_neighbors;
 };
 
-//******************************************************************************
-// Defining a function to initialize the grid
-//******************************************************************************
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief Initializes the grid with random binary values
+ * 
+ * @param seed int, the seed for the random number generator, this ensures robustness of the simulation and analysis
+ */
 void Grid::initializeGrid(int seed) {
-  /*
-      Initializes the grid with random binary values
-
-      Args:
-          size: int, the size of the grid
-          seed: int, the seed for the random number generator,
-              this ensures robustness of the simulation and analysis
-
-      Returns:
-          2D array, the initialized grid
-  */
-
   // Setting the seed for the random number generator
   srand(seed);
 
@@ -316,21 +279,15 @@ void Grid::initializeGrid(int seed) {
   }
 }
 
-//******************************************************************************
-//  // Define a function to reorganize 1D grid so that each chunk to be
-//  scattered is contiguous in memory
-//******************************************************************************
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @brief MPI function to reorganize the 1D grid so that each chunk to be scattered is contiguous in memory
+ * 
+ * @param nranks int, the number of processes
+ */
 void Grid::reorganizeGrid(int nranks) {
-  /*
-      Reorganizes the 1D grid so that each chunk to be scattered is contiguous
-     in memory
-
-      Args:
-          None
-
-      Returns:
-          void
-  */
 
   // Process grid size
   int process_grid_size =
@@ -373,21 +330,16 @@ void Grid::reorganizeGrid(int nranks) {
   grid = new_grid;
 };
 
-//******************************************************************************
-// MPI Function to communicate the boundary cells with the neighboring processes
-//******************************************************************************
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief MPI function to communicate the boundary cells with the neighboring processes
+ * 
+ * @param rank int, the rank of the current process
+ * @param nranks int, the number of processes
+ */
 void Grid::communicateBoundary(int rank, int nranks) {
-  /*
-      Communicates the boundary cells with the neighboring processes
-
-      Args:
-          rank: int, the rank of the current process
-          nranks: int, the number of processes
-
-      Returns:
-          void
-  */
 
   // 2D Domain decomposition has 8 neighbors
   // Calculate the rank of the neighboring processes
@@ -464,4 +416,5 @@ void Grid::communicateBoundary(int rank, int nranks) {
   MPI_Barrier(MPI_COMM_WORLD);  // Synchronize all processes
 };
 
-//******************************************************************************
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
