@@ -1,6 +1,7 @@
 # Make file for CMake Project commands
 
-BUILDS = build release debug clean
+# Name of the targets
+BUILDS = build release debug clean docs test
 
 .PHONY := $(BUILDS)
 
@@ -19,6 +20,8 @@ build:
 	@echo "Specify which sub-build directory to use for compilation "
 	cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE="-O1"
 	cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
+	cmake -S . -B build/docs
+	cmake -S . -B build/test
 	@echo "Done!"
 
 
@@ -44,3 +47,17 @@ clean:
 	rm -rf build
 	@echo "Done Cleaning CMake Project!"
 	@echo "You need to run 'make build' to rebuild the project."
+
+docs:
+# Generate the documentation for the project.
+	@echo "Generating Documentation for the project ..."
+	cmake --build build/docs -t doxygen
+	@echo "Documentation generated in the specified Doxygen output directory!"
+
+
+test:
+# Run the tests for the project.
+	@echo "Running tests for the project ..."
+	cmake --build build/test
+	ctest --test-dir build/test
+	@echo "Done!"
