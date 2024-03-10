@@ -1,6 +1,9 @@
 # Build directory
 /build/
 
+# Docs directory
+/docs/
+
 # Prerequisites
 *.d
 
