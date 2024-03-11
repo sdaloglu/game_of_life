@@ -8,6 +8,9 @@ project(
     LANGUAGES CXX
 )
 
+# Enable testing
+enable_testing()
+
 
 # Set C++ standard to C++11
 set(CMAKE_CXX_STANDARD 17)
@@ -31,13 +34,16 @@ include(ClangTidy)
 # Include other CMake submodules in the source directory
 add_subdirectory(src)
 
+# Include the test directory
+add_subdirectory(test)
+
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 
 
 # Find MPI
 find_package(MPI REQUIRED)
-# Link MPI to the executable
+# Link MPI to the executable inherited from the src directory
 target_link_libraries(game PUBLIC MPI::MPI_CXX)
 
 
