@@ -1,7 +1,7 @@
 # Make file for CMake Project commands
 
 # Name of the targets
-BUILDS = build release debug clean docs test
+BUILDS = build release debug clean docs run_tests
 
 .PHONY := $(BUILDS)
 
@@ -18,7 +18,7 @@ build:
 # This step prepares the project for compilation.
 	@echo "Building CMake Projectcs for both debug and release ..."
 	@echo "Specify which sub-build directory to use for compilation "
-	cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE="-O1"
+	cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE="-O3" 
 	cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
 	cmake -S . -B build/docs
 	cmake -S . -B build/test
@@ -55,9 +55,9 @@ docs:
 	@echo "Documentation generated in the specified Doxygen output directory!"
 
 
-test:
+run_tests:
 # Run the tests for the project.
-	@echo "Running tests for the project ..."
-	cmake --build build/test
-	ctest --test-dir build/test
+	@echo "Running test for the project ..."
+	cmake --build build/test --target test_grid
+	ctest --test-dir build/test -C Debug
 	@echo "Done!"
