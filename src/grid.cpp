@@ -5,15 +5,19 @@
  * - initializeGrid: Initializes the grid with random binary values
  * - updateGrid: Updates the grid based on the rules of the game
  * - printGrid: Prints the grid to the console
- * - countLiveNeighbors: Counts the number of live neighbors for each cell in the grid
- * - reorganizeGrid: Reorganizes the 1D grid so that each chunk to be scattered is contiguous in memory
- * - communicateBoundary: Communicates the boundary cells with the neighboring processes
+ * - countLiveNeighbors: Counts the number of live neighbors for each cell in
+ * the grid
+ * - reorganizeGrid: Reorganizes the 1D grid so that each chunk to be scattered
+ * is contiguous in memory
+ * - communicateBoundary: Communicates the boundary cells with the neighboring
+ * processes
  * - getGrid: Returns the pointer to the grid
  * - setGrid: Initializes the grid with the user input
  * - operator(): Access the elements of the grid (by using 2D index convention)
  * - Grid: Constructor for the grid to initialize the class's member variables
- * - ~Grid: Destructor for the grid to deallocate the memory used by the grid object
-*/
+ * - ~Grid: Destructor for the grid to deallocate the memory used by the grid
+ * object
+ */
 #include "grid.h"
 
 #include <mpi.h>  // for MPI functions
@@ -25,7 +29,6 @@
 //*****************************************************************************************
 //***************************----PUBLIC----************************************************
 //*****************************************************************************************
-
 
 /**
  * @brief Constructor for the grid to initialize the class's member variables.
@@ -58,33 +61,30 @@ Grid::~Grid() {
 
 /**
  * @brief Returns the pointer to the grid
- * 
+ *
  * @return int* The pointer to the grid
  */
-int* Grid::getGrid() {
-  return grid;
-};
+int* Grid::getGrid() { return grid; };
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
  * @brief Access the elements of the grid using 2D index convention
- * 
+ *
  * @param row int, the row index of the cell
  * @param col int, the column index of the cell
  * @return int&, the value of the cell in the grid
  */
-int& Grid::operator()(int row, int col) {
-  return grid[row * size2 + col];
-};
+int& Grid::operator()(int row, int col) { return grid[row * size2 + col]; };
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * @brief Initializes the grid with the user input, assumes the input grid is a square
- * 
+ * @brief Initializes the grid with the user input, assumes the input grid is a
+ * square
+ *
  * @param initialGrid int*, the initial grid provided by the user
  */
 void Grid::setGrid(const int* initialGrid) {
@@ -98,10 +98,14 @@ void Grid::setGrid(const int* initialGrid) {
 
 /**
  * @brief Updates the grid based on the rules of the game:
- * - 1. Any live cell with fewer than two live neighbors dies, as if by underpopulation
- * - 2. Any live cell with more than three live neighbors dies, as if by overpopulation
- * - 3. Any live cell with two or three live neighbors lives on to the next generation
- * - 4. Any dead cell with exactly three live neighbors becomes a live cell, as if by reproduction
+ * - 1. Any live cell with fewer than two live neighbors dies, as if by
+ * underpopulation
+ * - 2. Any live cell with more than three live neighbors dies, as if by
+ * overpopulation
+ * - 3. Any live cell with two or three live neighbors lives on to the next
+ * generation
+ * - 4. Any dead cell with exactly three live neighbors becomes a live cell, as
+ * if by reproduction
  */
 void Grid::updateGrid() {
   // Create a new grid to store the updated values after applying the rules of
@@ -161,7 +165,7 @@ void Grid::updateGrid() {
 
 /**
  * @brief Prints the grid to the terminal
- * 
+ *
  */
 void Grid::printGrid() {
   // Iterate through the grid and print the values to the terminal
@@ -186,16 +190,15 @@ void Grid::printGrid() {
 
 /**
  * @brief Counts the number of live neighbors for each cell in the grid
- * 
+ *
  * @param row int, the row index of the cell
  * @param col int, the column index of the cell
- * @param method std::string, the method to use for counting the number of live neighbors
+ * @param method std::string, the method to use for counting the number of live
+ * neighbors
  * @return int the number of live neighbors for each cell in the grid
  */
 int Grid::countLiveNeighbors(int row, int col,
                              std::string method = "for_loop") {
-  
-
   // Initialize the number of live neighbors
   int live_neighbors = 0;
 
@@ -262,8 +265,9 @@ int Grid::countLiveNeighbors(int row, int col,
 ////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief Initializes the grid with random binary values
- * 
- * @param seed int, the seed for the random number generator, this ensures robustness of the simulation and analysis
+ *
+ * @param seed int, the seed for the random number generator, this ensures
+ * robustness of the simulation and analysis
  */
 void Grid::initializeGrid(int seed) {
   // Setting the seed for the random number generator
@@ -283,12 +287,12 @@ void Grid::initializeGrid(int seed) {
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * @brief MPI function to reorganize the 1D grid so that each chunk to be scattered is contiguous in memory
- * 
+ * @brief MPI function to reorganize the 1D grid so that each chunk to be
+ * scattered is contiguous in memory
+ *
  * @param nranks int, the number of processes
  */
 void Grid::reorganizeGrid(int nranks) {
-
   // Process grid size
   int process_grid_size =
       sqrt(nranks);  // Assuming the number of processes is a perfect square
@@ -334,13 +338,13 @@ void Grid::reorganizeGrid(int nranks) {
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * @brief MPI function to communicate the boundary cells with the neighboring processes
- * 
+ * @brief MPI function to communicate the boundary cells with the neighboring
+ * processes
+ *
  * @param rank int, the rank of the current process
  * @param nranks int, the number of processes
  */
 void Grid::communicateBoundary(int rank, int nranks) {
-
   // 2D Domain decomposition has 8 neighbors
   // Calculate the rank of the neighboring processes
 
