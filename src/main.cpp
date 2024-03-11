@@ -1,13 +1,23 @@
-#include <mpi.h>
+/**
+ * @file main.cpp
+ * @author Sabahattin Mert Daloglu (sm89@cam.ac.uk)
+ * @brief
+ * @version 0.1
+ * @date 2024-03-11
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 
 #include <chrono>
 #include <iostream>  //for input and output
 #include <thread>
 
 #include "grid.h"
+#include "timing.h"
 
 /**
- * @brief The main functoin for the Conway's Game of Life with periodic boundary
+ * @brief The main function for the Conway's Game of Life with periodic boundary
  * conditions.
  *
  * @param argc int, the number of command line arguments
@@ -15,18 +25,6 @@
  * @return int the exit code of the program
  */
 int main(int argc, char* argv[]) {
-  /*
-      The main function for the Conway's Game of Life with periodic boundary
-     conditions.
-
-      Args:
-          argc: int, the number of command line arguments
-          argv: char*, the command line arguments
-
-      Returns:
-          int, the exit code of the program
-  */
-
   // MPI_Init(&argc, &argv);
   // int rank, nranks;
   // MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -58,12 +56,12 @@ int main(int argc, char* argv[]) {
   // square grid
   Grid grid(grid_size, grid_size, 42);
   // Print the initial grid
-  for (int i = 0; i < grid_size; i++) {
-    for (int j = 0; j < grid_size; j++) {
-      std::cout << grid(i, j) << " ";
-    }
-    std::cout << std::endl;
-  }
+  // for (int i = 0; i < grid_size; i++) {
+  //   for (int j = 0; j < grid_size; j++) {
+  //     std::cout << grid(i, j) << " ";
+  //   }
+  //   std::cout << std::endl;
+  // }
 
   // Reoranize the grid so that each chunk to be scattered is contiguous in
   // memory
@@ -112,24 +110,21 @@ int main(int argc, char* argv[]) {
 
   // MPI_Finalize();
 
-  // if (rank == 0){
-  // //Run the game for 50 time steps only for visualization
-  // for (int time = 0; time < 50; ++time){
-  //     std::cout << "Time Step " << time << std::endl;
-  //     std::cout << "____________________" << std::endl;
-  //     grid.printGrid();
-  //     grid.updateGrid();
-  //     std::cout << "____________________" << std::endl;
-  //     std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Delay
-  //     for 500ms system("clear"); // Clear the console
-  // }
-  // }
+  // Run the game for 50 time steps only for visualization
+  for (int time = 0; time < 50; ++time) {
+    std::cout << "Time Step " << time << std::endl;
+    std::cout << "____________________" << std::endl;
+    // grid.printGrid();
+    timing::start_clock();  // Start the clock
+    grid.updateGrid();
+    double elapsed_time = timing::get_split();  // Stop the clock
+    std::cout << "Time taken for updating the grid: " << elapsed_time << " ms"
+              << std::endl;
+    std::cout << "____________________" << std::endl;
+    // std::this_thread::sleep_for(
+    //     std::chrono::milliseconds(500));  // Delay for 500ms
+    // system("clear");                      // Clear the console
+  }
 
-  // if (rank == 0){
-  // std::cout << "____________________" << std::endl;
-  // std::cout << "Final Grid" << std::endl;
-  // grid.printGrid();
-  // std::cout << "____________________" << std::endl;
-  // }
   return 0;
 }
