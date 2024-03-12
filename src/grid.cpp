@@ -118,7 +118,7 @@ void Grid::updateGrid() {
     for (int j = 0; j < size2; ++j) {  // Iterating over columns
 
       // Counting the number of live neighbors
-      int live_neighbors = countLiveNeighbors(i, j, "for_loop");
+      int live_neighbors = countLiveNeighbors(i, j, "1D_convolution");
       // The number of alive neighbors has been counted, now apply the rules of
       // the game
 
@@ -233,28 +233,33 @@ int Grid::countLiveNeighbors(int row, int col,
     }
   }
 
-  else if (method == "kernel") {
-    // Define the kernel for the game of life
-    int kernel[3][3] = {{1, 1, 1}, {1, 0, 1}, {1, 1, 1}};
+  else if (method == "1D_convolution") {
+    // Instead of defining a kernel we can treat the nested for loop index as a
+    // 2D kernel This nested for-loop can be reduced to a single for-loop
 
-    // Iterate through the kernel
-    for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        // Calculate the coordinates of the neighbors
-        int x_neighbour = ((row + i - 1) + size1) %
-                          size1;  // Adding and taking modulo of size ensures
-                                  // periodic boundaries
-        int y_neighbour =
-            ((col + j - 1) + size2) %
-            size2;  // Assuming the grid is a square --> size1 = size2
+    // Indices for navigating through 8 neighbors
+    int dx[8] = {-1, -1, -1, 0, 0,
+                 1,  1,  1};  // Notice the central index is removed since it is
+                              // the current cell
+    int dy[8] = {-1, 0, 1, -1, 1,
+                 -1, 0, 1};  // Notice the central index is removed since it is
+                             // the current cell
 
-        // Neighbour pixel is inside the grid, count the number of live
-        // neighbors
-        live_neighbors +=
-            kernel[i][j] *
-            (*this)(x_neighbour, y_neighbour);  // "*this" here is equivalent to
-                                                // "grid" in the main function
-      }
+    // By removing the central index, we also remove the need for the if
+    // statement to skip the current cell
+
+    // Iterate through the 8 neighbors of the current cell - single loop
+    for (int i = 0; i < 8; ++i) {
+      // Assuming boundaries are periodic, calculating the coordinates of the
+      // neighbors
+      int x_neighbour =
+          ((row + dx[i]) + size1) % size1;  // Adding and taking modulo of size
+                                            // ensures periodic boundaries
+      int y_neighbour = ((col + dy[i]) + size2) % size2;
+
+      live_neighbors +=
+          (*this)(x_neighbour, y_neighbour);  // "*this" here is equivalent to
+                                              // "grid" in the main function
     }
   }
 
