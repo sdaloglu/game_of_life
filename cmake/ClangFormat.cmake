@@ -13,5 +13,5 @@ function(ClangFormat target directory)
 
     # Add command to run clang-format on list of files before build
     add_custom_command(TARGET ${target} PRE_BUILD COMMAND
-    ${CLANG-FORMAT_PATH} -i --style=Google ${SOURCE_FILES})
+                    ${CLANG-FORMAT_PATH} -i ${SOURCE_FILES})
 endfunction()
