@@ -20,11 +20,11 @@
  */
 #include "grid.h"
 
-#include <mpi.h>  // for MPI functions
+#include <mpi.h> // for MPI functions
 
-#include <cstdlib>   // for rand and srand, to generate random numbers
-#include <iostream>  // for input and output
-#include <vector>    // for vector
+#include <cstdlib>  // for rand and srand, to generate random numbers
+#include <iostream> // for input and output
+#include <vector>   // for vector
 
 //*****************************************************************************************
 //***************************----PUBLIC----************************************************
@@ -39,9 +39,9 @@
  * robustness of the simulation and analysis
  */
 Grid::Grid(int size1, int size2, int seed) : size1(size1), size2(size2) {
-  grid = new int[size1 * size2];  // Allocate memory for the grid
+  grid = new int[size1 * size2]; // Allocate memory for the grid
 
-  initializeGrid(seed);  // Populate the grid with random binary values
+  initializeGrid(seed); // Populate the grid with random binary values
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -53,7 +53,7 @@ Grid::Grid(int size1, int size2, int seed) : size1(size1), size2(size2) {
  *
  */
 Grid::~Grid() {
-  delete[] grid;  // Deallocate memory for the grid
+  delete[] grid; // Deallocate memory for the grid
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -64,7 +64,7 @@ Grid::~Grid() {
  *
  * @return int* The pointer to the grid
  */
-int* Grid::getGrid() { return grid; };
+int *Grid::getGrid() const { return grid; };
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -76,7 +76,7 @@ int* Grid::getGrid() { return grid; };
  * @param col int, the column index of the cell
  * @return int&, the value of the cell in the grid
  */
-int& Grid::operator()(int row, int col) { return grid[row * size2 + col]; };
+int &Grid::operator()(int row, int col) { return grid[row * size2 + col]; };
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -87,17 +87,18 @@ int& Grid::operator()(int row, int col) { return grid[row * size2 + col]; };
  *
  * @param initialGrid int*, the initial grid provided by the user
  */
-void Grid::setGrid(const int* initialGrid) {
+void Grid::setGrid(const int *initialGrid) {
   memcpy(
       grid, initialGrid,
-      sizeof(int) * size1 * size2);  // Memory copy the user input to the grid
+      sizeof(int) * size1 * size2); // Memory copy the user input to the grid
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * @brief Updates the grid based on the rules of the game:
+ * @brief Updates the grid by using classical counting method and based on the
+ * rules of the game:
  * - 1. Any live cell with fewer than two live neighbors dies, as if by
  * underpopulation
  * - 2. Any live cell with more than three live neighbors dies, as if by
@@ -107,18 +108,18 @@ void Grid::setGrid(const int* initialGrid) {
  * - 4. Any dead cell with exactly three live neighbors becomes a live cell, as
  * if by reproduction
  */
-void Grid::updateGrid() {
+void Grid::updateGridCounting() {
   // Create a new grid to store the updated values after applying the rules of
   // the game
-  int* new_grid = new int[size1 * size2];  // Allocate memory for the new grid
+  int *new_grid = new int[size1 * size2]; // Allocate memory for the new grid
 
   // Iterate through each cell in the grid
-  for (int i = 0; i < size1; ++i) {  // Iterating over rows
+  for (int i = 0; i < size1; ++i) { // Iterating over rows
 
-    for (int j = 0; j < size2; ++j) {  // Iterating over columns
+    for (int j = 0; j < size2; ++j) { // Iterating over columns
 
       // Counting the number of live neighbors
-      int live_neighbors = countLiveNeighbors(i, j, "1D_convolution");
+      int live_neighbors = countLiveNeighbors(i, j);
       // The number of alive neighbors has been counted, now apply the rules of
       // the game
 
@@ -129,35 +130,85 @@ void Grid::updateGrid() {
       // operator() for indexing However, new_grid local variable is not a
       // member of the class, hence requires "index"
 
-      // Rule number1: Under-population
-      if (grid[index] == 1 && live_neighbors < 2) {
-        new_grid[index] = 0;  // the current cell dies
-      }
-      // Rule number2: Over-population
-      else if (grid[index] == 1 && live_neighbors > 3) {
-        new_grid[index] = 0;  // the current cell dies
-      }
-      // Rule number3: Survival - assuming its alive already
-      else if ((live_neighbors == 2 || live_neighbors == 3) &&
-               grid[index] == 1) {
-        new_grid[index] = 1;  // the current alive cell continues to live on to
-                              // the next generation
-      }
-
-      // Rule number4: Reproduction
-      else if (live_neighbors == 3 && grid[index] == 0) {
-        new_grid[index] =
-            1;  // the current dead cell becomes alive in the next generation
-      } else {
-        new_grid[index] = 0;  // the current dead cell remains dead
-      }
+      bool alive = grid[index] == 1;
+      bool survive = alive && (live_neighbors == 2 ||
+                               live_neighbors == 3); // Rule number3: Survival
+      bool reproduce =
+          !alive && live_neighbors == 3; // Rule number4: Reproduction
+      new_grid[index] =
+          survive || reproduce
+              ? 1
+              : 0; // If rule 3 or 4 is satisfied, the cell is alive, otherwise
+                   // it is dead due to rule 1 or 2
     }
   }
 
   // Deallocate the memory used by the previous grid
-  delete[] grid;  // Deallocate old "grid"
+  // delete[] grid;  // Deallocate old "grid"
+  // grid = new_grid;  // Set the grid to the new grid
 
-  grid = new_grid;  // Set the grid to the new grid
+  // Alternatively swap old grid with new grid without deallocating memory
+  // This is more efficient than deallocating and allocating memory
+  std::swap(grid, new_grid);
+
+  // Deallocate the memory used by the previous grid
+  delete[] new_grid; // After the swap, new_grid is the old grid
+};
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+void Grid::padding(int new_size1, int new_size2) {
+  // Takes the grid and adds a periodic padding if necessary to make the grid
+  // size divisible by the number of processes in each direction
+
+  int *new_grid =
+      new int[new_size1 * new_size2]; // Allocate memory for the new grid
+
+  // Fill the new grid with the old grid plus the periodic padding
+  for (int i = 0; i < new_size1; ++i) {
+    for (int j = 0; j < new_size2; ++j) {
+      new_grid[i * new_size2 + j] = grid[(i % size1) * size2 + (j % size2)];
+    }
+  }
+
+  // Delete the old grid memory
+  delete[] grid;
+
+  // Assign the new grid to the old grid
+  grid = new_grid;
+
+  // Update the size attributes of the grid
+  size1 = new_size1;
+  size2 = new_size2;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+void Grid::unpadGrid(int grid_size) {
+  int *unpadded_grid = new int[grid_size * grid_size]; // Allocate memory for the new grid
+
+  // Calculate the difference in size between the old and new grid
+  int padding_x = (size2 - grid_size) / 2;
+  int padding_y = (size1 - grid_size) / 2;
+
+  // Fill the new grid with the old grid plus the periodic padding
+  for (int i = 0; i < grid_size; ++i) {
+    for (int j = 0; j < grid_size; ++j) {
+      unpadded_grid[i * grid_size + j] = grid[i * size2 + j];
+    }
+  }
+
+  // Delete the old grid memory
+  delete[] grid;
+
+  // Assign the new grid to the old grid
+  grid = unpadded_grid;
+
+  // Update the size attributes of the grid
+  size1 = grid_size;
+  size2 = grid_size;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -175,9 +226,324 @@ void Grid::printGrid() {
 
       std::cout
           << ((*this)(row, col) ? "o" : ".")
-          << " ";  // "*this" here is equivalent to "grid" in the main function
+          << " "; // "*this" here is equivalent to "grid" in the main function
     }
-    std::cout << std::endl;  // End of each row
+    std::cout << std::endl; // End of each row
+  }
+};
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @brief MPI function to reorganize the 1D grid so that each chunk to be
+ * scattered is contiguous in memory
+ *
+ * @param nranks int, the number of processes
+ */
+void Grid::reorganizeGrid(int n_process_x, int n_process_y) {
+  int *new_grid = new int[size1 * size2]; // Allocate memory for the new grid
+
+  // Calculate the size of the each process's grid
+  int process_cols =
+      size2 / n_process_x; // Number of columns in each process's grid
+  int process_rows =
+      size1 / n_process_y; // Number of rows in each process's grid
+
+  // Number of elements in each chunk to be scattered
+  int chunk_size = process_cols * process_rows;
+
+  // Reorganize the grid so that each chunk to be scattered is contiguous in
+  // memory
+  for (int proc_y = 0; proc_y < n_process_y;
+       ++proc_y) { // Iterate through each row of processes
+    for (int proc_x = 0; proc_x < n_process_x;
+         ++proc_x) { // Iterate through each column of processes
+      // Iterate through each cell in the process's grid
+      for (int row = 0; row < process_rows; ++row) {
+        for (int col = 0; col < process_cols; ++col) {
+          int global_row = proc_y * process_rows + row;
+          int global_col = proc_x * process_cols + col;
+          int index_in_global = global_row * size2 + global_col;
+
+          int index_in_chunk = row * process_cols + col;
+          int chunk_start_index = (proc_y * n_process_x + proc_x) * chunk_size;
+
+          new_grid[chunk_start_index + index_in_chunk] = grid[index_in_global];
+        }
+      }
+    }
+  }
+
+  // Delete the old grid
+  delete[] grid;
+
+  // Swap the old grid with the new grid
+  std::swap(grid, new_grid);
+};
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+void Grid::inverseReorganizeGrid(int n_process_x, int n_process_y) {
+  int *original_grid =
+      new int[size1 * size2]; // Allocate memory for the new grid
+
+  // Calculate the size of the each process's grid
+  int process_cols =
+      size2 / n_process_x; // Number of columns in each process's grid
+  int process_rows =
+      size1 / n_process_y; // Number of rows in each process's grid
+
+  // Number of elements in each chunk to be scattered
+  int chunk_size = process_cols * process_rows;
+
+  // Iterate over the grid that is contiguous in memory for each process
+  for (int proc_y = 0; proc_y < n_process_y;
+       ++proc_y) { // Iterate through each row of processes
+    for (int proc_x = 0; proc_x < n_process_x;
+         ++proc_x) { // Iterate through each column of processes
+      // Iterate through each cell in the process's grid
+      for (int row = 0; row < process_rows; ++row) {
+        for (int col = 0; col < process_cols; ++col) {
+          int global_row = proc_y * process_rows + row;
+          int global_col = proc_x * process_cols + col;
+          int index_in_global = global_row * size2 + global_col;
+
+          int index_in_chunk = row * process_cols + col;
+          int chunk_start_index = (proc_y * n_process_x + proc_x) * chunk_size;
+
+          original_grid[index_in_global] =
+              grid[chunk_start_index + index_in_chunk];
+        }
+      }
+    }
+  }
+
+  // Delete the old grid
+  delete[] grid;
+
+  // Swap the old grid with the new grid
+  std::swap(grid, original_grid);
+};
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+void Grid::AddVerticalPadding(int process_cols, int process_rows) {
+  // Add vertical padding to the grid
+  int *padded_grid = new int[(process_rows + 2) * process_cols]; // Allocate memory for the new grid
+
+  // Initialize the top and bottom halo rows to 0
+  std::fill_n(padded_grid, process_cols, 0);
+  std::fill_n(&padded_grid[(process_rows + 1) * process_cols], process_cols, 0);
+
+  // Fill the new grid with the old grid plus the vertical padding
+  for (int i = 0; i < process_rows; ++i) {
+    for (int j = 0; j < process_cols; ++j) {
+      padded_grid[(i + 1) * process_cols + j] = grid[i * process_cols + j];
+    }
+  }
+
+  // Delete the old grid
+  delete[] grid;
+
+  grid = padded_grid;
+
+  // Update the size attributes of the grid
+  size1 = process_rows + 2;
+  size2 = process_cols;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+void Grid::VerticalHaloExchange(int rank, int ranks, MPI_Comm cart_comm) {
+
+  // Determine the ranks of up and down neighbors
+  int up, down;
+  MPI_Cart_shift(cart_comm, 0, 1, &up, &down);
+
+  MPI_Request send_request[2],
+      recv_request[2]; // MPI request objects for non-blocking communication
+
+  // Communicate the boundary cells with the neighboring processes
+  // Send the top row to the top neighbor and receive the top row from the
+  // bottom neighbor
+  MPI_Isend(&grid[size2], size2, MPI_INT, up, 0, cart_comm,
+            &send_request[0]);
+  MPI_Irecv(&grid[(size1 - 1) * size2], size2, MPI_INT, down, 0, cart_comm,
+            &recv_request[0]);
+
+  // Send the bottom row to the bottom neighbor and receive the bottom row from
+  // the top neighbor
+  MPI_Isend(&grid[(size1 - 2) * size2], size2, MPI_INT, down, 0, cart_comm,
+            &send_request[1]);
+  MPI_Irecv(&grid[0], size2, MPI_INT, up, 0, cart_comm, &recv_request[1]);
+
+  // Wait for the non-blocking communication to finish
+  MPI_Waitall(2, send_request, MPI_STATUS_IGNORE);
+  MPI_Waitall(2, recv_request, MPI_STATUS_IGNORE);
+};
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+void Grid::AddHorizontalPadding(int process_cols, int process_rows) {
+  // Add horizontal padding to the grid
+  int *padded_grid = new int[process_rows * (process_cols + 2)]; // Allocate memory for the new grid
+
+  // Initialize the left and right halo columns to 0
+  for (int i = 0; i < process_rows; ++i) {
+    padded_grid[i * (process_cols + 2)] = 0; // Leftmost column
+
+    // Copy the original grid to the new grid
+    for (int j = 0; j < process_cols; ++j) {
+      padded_grid[i * (process_cols + 2) + (j + 1)] = grid[i * process_cols + j];
+    }
+
+    padded_grid[i * (process_cols + 2) + process_cols + 1] = 0; // Rightmost column
+  }
+  // Delete the old grid
+  delete[] grid;
+
+  grid = padded_grid;
+
+  // Update the size attributes of the grid
+  size1 = process_rows;
+  size2 = process_cols + 2;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+void Grid::HorizontalHaloExchange(int rank, int ranks, MPI_Comm cart_comm) {
+
+  // Determine the ranks of left and right neighbors
+  int left, right;
+  MPI_Cart_shift(cart_comm, 1, 1, &left, &right);
+
+  // Accessing column is strided so we need to use MPI_Type_vector
+  MPI_Datatype column_type;
+
+  MPI_Type_vector(size1, 1, size2, MPI_INT, &column_type);
+  MPI_Type_commit(&column_type);
+
+  // Communicate the boundary cells with the neighboring processes
+  MPI_Request send_request[2], recv_request[2]; // MPI request objects for non-blocking communication
+
+  // Send the left column to the left neighbor and receive the left column from
+  // the right neighbor
+  MPI_Isend(&grid[1], 1, column_type, left, 0, cart_comm,
+            &send_request[0]);
+  MPI_Irecv(&grid[size2 - 1], 1, column_type, right, 0, cart_comm,
+            &recv_request[0]);
+
+  // Send the right column to the right neighbor and receive the right column
+  // from the left neighbor
+  MPI_Isend(&grid[size2 - 2], 1, column_type, right, 0, cart_comm,
+            &send_request[1]);
+  MPI_Irecv(&grid[0], 1, column_type, left, 0, cart_comm,
+            &recv_request[1]);
+
+  // Wait for the non-blocking communication to finish
+  MPI_Waitall(2, send_request, MPI_STATUS_IGNORE);
+  MPI_Waitall(2, recv_request, MPI_STATUS_IGNORE);
+
+  // Free the MPI datatype
+  MPI_Type_free(&column_type);
+};
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+void Grid::VerticalConv(int process_cols, int process_rows) {
+  // This function will be called on vertically padded grids
+  // It will perform the vertical convolution that will shrink the padded grid
+  // into the original size
+
+  int *vertical_sum_array = new int[process_cols * process_rows]; // Allocate memory for the new grid
+
+  for (int i = 0; i < process_rows; ++i) {
+    for (int j = 0; j < process_cols; ++j) {
+      int sum = 0;
+      for (int dx = -1; dx <= 1; ++dx) {
+        int x_neighbour = (i + dx) + 1; // adjust the index to account for the padding
+
+        sum += grid[x_neighbour * process_cols + j];
+      }
+      vertical_sum_array[i * process_cols + j] = sum;
+    }
+  }
+
+  // Free the original grid memory
+  delete[] grid;
+
+  grid = vertical_sum_array;
+
+  // Update the vertically reduced size of the grid
+  size1 = process_rows;
+  size2 = process_cols;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+void Grid::HorizontalConv(int process_cols, int process_rows) {
+  // This function will be called on horizontally padded grids
+  // It will perform the horizontal convolution that will shrink the padded grid
+  // into the original size
+
+  int *horizontal_sum_array = new int[process_cols * process_rows]; // Allocate memory for the new grid
+
+  // Convolution with no padding
+  for (int i = 0; i < process_rows; ++i) {
+    for (int j = 0; j < process_cols; ++j) {
+      int sum = 0;
+      for (int dy = -1; dy <= 1; ++dy) {
+        int y_neighbour = (j + dy) + 1; // adjust the index to account for the padding
+
+        sum += grid[i * (process_cols + 2) + y_neighbour];
+      }
+      horizontal_sum_array[i * process_cols + j] = sum;
+    }
+  }
+
+  // Free the original grid memory
+  delete[] grid;
+
+  grid = horizontal_sum_array;
+
+  // Update the horizontally reduced size of the grid
+  size1 = process_rows;
+  size2 = process_cols;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+void Grid::ApplyGameRules(const Grid &conv_grid) {
+
+  // Updates the grid by applying Game of Life rules
+  // The rules are updated to count for seperated 2D convolution
+  // where the cell itself is also included in the convolution result
+
+  const int *conv_grid_data = conv_grid.getGrid();
+  // Iterate through each cell in the grid
+  for (int i = 0; i < size1; ++i) { // Iterating over array
+    for (int j = 0; j < size2; ++j) {
+      int index = i * size2 + j;
+
+      int live_neighbors = conv_grid_data[index]; // Use the convolution result at the index (includes cell itself)
+
+      if (live_neighbors == 3) {
+        grid[index] = 1; // Reproduction or survival if initially alive with 2 live neighbors
+      } else if (live_neighbors == 4) {
+        continue; // Survival for live cells with 3 live neighbors
+      } else {
+        grid[index] = 0; // Rule number1 and 2: Underpopulation and Overpopulation
+      }
+    }
   }
 };
 
@@ -197,72 +563,38 @@ void Grid::printGrid() {
  * neighbors
  * @return int the number of live neighbors for each cell in the grid
  */
-int Grid::countLiveNeighbors(int row, int col,
-                             std::string method = "for_loop") {
+int Grid::countLiveNeighbors(int row, int col) {
   // Initialize the number of live neighbors
   int live_neighbors = 0;
 
-  if (method == "for_loop") {
-    // Iterate through the neighbour of the current cell - nested loop
-    for (int dx = -1; dx <= 1; ++dx) {
-      for (int dy = -1; dy <= 1; ++dy) {
-        // This mini 3x3 grid also includes the current cell which we want to
-        // skip
-        if (dx == 0 && dy == 0) {
-          continue;
-        }
-
-        // Assuming boundaries are periodic, calculating the coordinates of the
-        // neighbors
-        int x_neighbour =
-            ((row + dx) + size1) % size1;  // Adding and taking modulo of size
-                                           // ensures periodic boundaries
-        int y_neighbour =
-            ((col + dy) + size2) %
-            size2;  // Assuming the grid is a square --> size1 = size2
-
-        // For periodic boundaries, no need to check if any of the neighbors are
-        // outside the grid
-
-        // Neighbour pixel is inside the grid, count the number of live
-        // neighbors
-        live_neighbors +=
-            (*this)(x_neighbour, y_neighbour);  // "*this" here is equivalent to
-                                                // "grid" in the main function
+  // Iterate through the neighbour of the current cell - nested loop
+  for (int dx = -1; dx <= 1; ++dx) {
+    for (int dy = -1; dy <= 1; ++dy) {
+      // This mini 3x3 grid also includes the current cell which we want to
+      // skip
+      if (dx == 0 && dy == 0) {
+        continue;
       }
-    }
-  }
 
-  else if (method == "1D_convolution") {
-    // Instead of defining a kernel we can treat the nested for loop index as a
-    // 2D kernel This nested for-loop can be reduced to a single for-loop
-
-    // Indices for navigating through 8 neighbors
-    int dx[8] = {-1, -1, -1, 0, 0,
-                 1,  1,  1};  // Notice the central index is removed since it is
-                              // the current cell
-    int dy[8] = {-1, 0, 1, -1, 1,
-                 -1, 0, 1};  // Notice the central index is removed since it is
-                             // the current cell
-
-    // By removing the central index, we also remove the need for the if
-    // statement to skip the current cell
-
-    // Iterate through the 8 neighbors of the current cell - single loop
-    for (int i = 0; i < 8; ++i) {
       // Assuming boundaries are periodic, calculating the coordinates of the
       // neighbors
       int x_neighbour =
-          ((row + dx[i]) + size1) % size1;  // Adding and taking modulo of size
-                                            // ensures periodic boundaries
-      int y_neighbour = ((col + dy[i]) + size2) % size2;
+          ((row + dx) + size1) % size1; // Adding and taking modulo of size
+                                        // ensures periodic boundaries
+      int y_neighbour =
+          ((col + dy) + size2) %
+          size2; // Assuming the grid is a square --> size1 = size2
 
+      // For periodic boundaries, no need to check if any of the neighbors are
+      // outside the grid
+
+      // Neighbour pixel is inside the grid, count the number of live
+      // neighbors
       live_neighbors +=
-          (*this)(x_neighbour, y_neighbour);  // "*this" here is equivalent to
-                                              // "grid" in the main function
+          (*this)(x_neighbour, y_neighbour); // "*this" here is equivalent to
+                                             // "grid" in the main function
     }
   }
-
   return live_neighbors;
 };
 
@@ -283,147 +615,7 @@ void Grid::initializeGrid(int seed) {
     for (int j = 0; j < size2; ++j) {
       (*this)(i, j) =
           rand() %
-          2;  // modulo 2 ensures that the value is either 0 or 1 (even or odd)
+          2; // modulo 2 ensures that the value is either 0 or 1 (even or odd)
     }
   }
 }
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-
-/**
- * @brief MPI function to reorganize the 1D grid so that each chunk to be
- * scattered is contiguous in memory
- *
- * @param nranks int, the number of processes
- */
-void Grid::reorganizeGrid(int nranks) {
-  // Process grid size
-  int process_grid_size =
-      sqrt(nranks);  // Assuming the number of processes is a perfect square
-
-  int* new_grid = new int[size1 * size2];  // Allocate memory for the new grid
-  int num_rows_subgrid =
-      size1 / process_grid_size;  // Number of rows in each subgrid
-  int num_cols_subgrid =
-      size2 / process_grid_size;  // Number of columns in each subgrid
-
-  // Reorganize the grid so that each chunk to be scattered is contiguous in
-  // memory
-
-  for (int subgrid_row = 0; subgrid_row < num_rows_subgrid; ++subgrid_row) {
-    for (int subgrid_col = 0; subgrid_col < num_cols_subgrid; ++subgrid_col) {
-      for (int row = 0; row < process_grid_size; ++row) {
-        for (int col = 0; col < process_grid_size; ++col) {
-          // Calculate the original row and column of the cell
-          int original_row = subgrid_row * process_grid_size + row;
-          int original_col = subgrid_col * process_grid_size + col;
-          // Calculate the new index of the cell in the new grid
-          int new_index =
-              (subgrid_row * num_cols_subgrid * process_grid_size *
-               process_grid_size) +
-              (subgrid_col * process_grid_size * process_grid_size) +
-              (row * process_grid_size) + col;
-          // Calculate the original index of the cell in the old grid
-          int original_index = original_row * size2 + original_col;
-          new_grid[new_index] = grid[original_index];  // Copy the value of the
-                                                       // cell to the new grid
-        }
-      }
-    }
-  }
-  // Delete the old grid memory
-  delete[] grid;
-
-  // Set the grid to the new grid
-  grid = new_grid;
-};
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-
-/**
- * @brief MPI function to communicate the boundary cells with the neighboring
- * processes
- *
- * @param rank int, the rank of the current process
- * @param nranks int, the number of processes
- */
-void Grid::communicateBoundary(int rank, int nranks) {
-  // 2D Domain decomposition has 8 neighbors
-  // Calculate the rank of the neighboring processes
-
-  int process_grid_size =
-      sqrt(nranks);  // Assuming the number of processes is a perfect square
-  int row =
-      rank / process_grid_size;  // Calculate the row of the current process
-  int col =
-      rank % process_grid_size;  // Calculate the column of the current process
-
-  // Define the ranks of the neighboring processes
-  int top =
-      (row - 1 + process_grid_size) % process_grid_size * process_grid_size +
-      col;
-  int bottom = (row + 1) % process_grid_size * process_grid_size + col;
-  int left = row * process_grid_size +
-             (col - 1 + process_grid_size) % process_grid_size;
-  int right = row * process_grid_size + (col + 1) % process_grid_size;
-  int top_left =
-      (row - 1 + process_grid_size) % process_grid_size * process_grid_size +
-      (col - 1 + process_grid_size) % process_grid_size;
-  int top_right =
-      (row - 1 + process_grid_size) % process_grid_size * process_grid_size +
-      (col + 1) % process_grid_size;
-  int bottom_left = (row + 1) % process_grid_size * process_grid_size +
-                    (col - 1 + process_grid_size) % process_grid_size;
-  int bottom_right = (row + 1) % process_grid_size * process_grid_size +
-                     (col + 1) % process_grid_size;
-
-  // Communicate the boundary cells with the neighboring processes
-  // Send the top row to the top neighbor and receive the bottom row from the
-  // top neighbor
-  MPI_Sendrecv(&grid[size2], size2, MPI_INT, top, 0, &grid[(size1 - 1) * size2],
-               size2, MPI_INT, bottom, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-  // Send the bottom row to the bottom neighbor and receive the top row from the
-  // bottom neighbor
-  MPI_Sendrecv(&grid[(size1 - 2) * size2], size2, MPI_INT, bottom, 0, &grid[0],
-               size2, MPI_INT, top, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-  // Send the left column to the left neighbor and receive the right column from
-  // the left neighbor
-  for (int i = 0; i < size1; ++i) {
-    MPI_Sendrecv(&grid[i * size2 + 1], 1, MPI_INT, left, 0,
-                 &grid[i * size2 + size2 - 1], 1, MPI_INT, right, 0,
-                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-  }
-
-  // Send the right column to the right neighbor and receive the left column
-  // from the right neighbor
-  for (int i = 0; i < size1; ++i) {
-    MPI_Sendrecv(&grid[i * size2 + size2 - 2], 1, MPI_INT, right, 0,
-                 &grid[i * size2], 1, MPI_INT, left, 0, MPI_COMM_WORLD,
-                 MPI_STATUS_IGNORE);
-  }
-
-  // Communicate the corner cells with the neighboring processes
-  MPI_Sendrecv(&grid[1], 1, MPI_INT, top_left, 0, &grid[size2 * size1 - 1], 1,
-               MPI_INT, bottom_right, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-  MPI_Sendrecv(&grid[size2 - 2], 1, MPI_INT, top_right, 0,
-               &grid[size2 * size1 - size2], 1, MPI_INT, bottom_left, 0,
-               MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-  MPI_Sendrecv(&grid[size2 * size1 - size2 + 1], 1, MPI_INT, bottom_left, 0,
-               &grid[size2 - 1], 1, MPI_INT, top_right, 0, MPI_COMM_WORLD,
-               MPI_STATUS_IGNORE);
-
-  MPI_Sendrecv(&grid[size2 * size1 - 2], 1, MPI_INT, bottom_right, 0,
-               &grid[size2], 1, MPI_INT, top_left, 0, MPI_COMM_WORLD,
-               MPI_STATUS_IGNORE);
-
-  MPI_Barrier(MPI_COMM_WORLD);  // Synchronize all processes
-};
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
