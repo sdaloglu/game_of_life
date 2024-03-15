@@ -30,5 +30,5 @@ make run_tests
 
 After compiling the project, an executable for the game will be created and should from the root directory as:
 ```bash
-./build/release/src/game {Grid size} {time steps}
+./build/release/src/game {Grid size} {time steps} {timing/visual/cache_blocking}
 ```
