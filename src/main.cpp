@@ -10,7 +10,8 @@
  */
 
 #include <chrono>
-#include <iostream>  //for input and output
+#include <fstream>
+#include <iostream> //for input and output
 #include <thread>
 
 #include "grid.h"
@@ -24,107 +25,171 @@
  * @param argv char*, the command line arguments
  * @return int the exit code of the program
  */
-int main(int argc, char* argv[]) {
-  // MPI_Init(&argc, &argv);
-  // int rank, nranks;
-  // MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  // MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+int main(int argc, char *argv[]) {
 
-  // Input the size of the grid from the command line
-  int grid_size = std::stoi(argv[1]);  // Size of the grid
+  MPI_Init(&argc, &argv);
 
-  //
-  // int process_sqrt = static_cast<int>(sqrt(nranks));  // Cast to int
-  // Check if nrank is a perfect square
-  // if (process_sqrt * process_sqrt != nranks) {
-  //   std::cerr << "The number of processes must be a perfect square"
-  //             << std::endl;
-  //   return 1;
-  // }
+  int rank, nranks;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &nranks);
 
-  // Check if the grid size is divisible by the number of processes
-  // if (grid_size % process_sqrt != 0) {
-  //   std::cerr << "The size of the grid must be divisible by the square root
-  //   of "
-  //                "the number of processes"
-  //             << std::endl;
-  //   return 1;
-  // }
+  int grid_size = std::stoi(argv[1]);  // Size of the grid, must be a square
+  int time_steps = std::stoi(argv[2]); // Number of time steps to evolve the grid
 
   // Generate the initial state of the game -- random binary matrix (square
   // grid) of size Size 10x10 This could also be a user input file containing a
   // square grid
+
+  int beehive[25] = {0, 0, 0, 0, 0, // This is an example of a still life called Beehive
+                     0, 0, 1, 1, 0,
+                     0, 1, 0, 0, 1,
+                     0, 0, 1, 1, 0,
+                     0, 0, 0, 0, 0};
+  int blinker[25] = {0, 0, 0, 0, 0, // This is an example of a still life called Beehive
+                     0, 0, 0, 0, 0,
+                     0, 1, 1, 1, 0,
+                     0, 0, 0, 0, 0,
+                     0, 0, 0, 0, 0};
   Grid grid(grid_size, grid_size, 42);
-  // Print the initial grid
-  // for (int i = 0; i < grid_size; i++) {
-  //   for (int j = 0; j < grid_size; j++) {
-  //     std::cout << grid(i, j) << " ";
-  //   }
-  //   std::cout << std::endl;
-  // }
+  // grid.setGrid(beehive);
 
-  // Reoranize the grid so that each chunk to be scattered is contiguous in
-  // memory
-  // grid.reorganizeGrid(nranks);
-  // Put a test here to see if the grid is reorganized correctly
+  MPI_Comm cart_comm; // Define a new communicator for the 2D grid of processes
+  // Using the Cartesian Communicator to create a 2D grid of processes
+  int dims[2] = {0, 0};    // Specify the number of processes in each dimension, 0
+                           // means that MPI_Cart_create will determine the number
+                           // of processes in each dimension
+  int periods[2] = {1, 1}; // Periodic boundaries in both dimensions (wrap around)
+  int reorder = 1;         // Allow processes to be reordered for efficiency
+  int coords[2];           // Coordinates of the current process
 
-  // The size of each chunk to be scattered
-  // int chunk_size = grid_size / sqrt(nranks);
+  MPI_Dims_create(nranks, 2, dims);                                       // Determine the number of processes in each dimension
+  MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, reorder, &cart_comm); // Create a 2D Cartesian communicator
+  MPI_Cart_get(cart_comm, 2, dims, periods, coords);                      // Get the dimensions and coordinates of the Cartesian communicator
 
-  // Define a local buffer to receive the scattered grid -- randomly filled
-  // Grid local_grid(chunk_size, chunk_size, 5);
+  int n_process_x = dims[0];
+  int n_process_y = dims[1];
+  int process_cols, process_rows;
+
+  if (rank == 0) {
+
+    // Checking if the grid requires padding for the scatter
+    if (grid_size % n_process_x != 0 || grid_size % n_process_y != 0) {
+      int new_size_x = grid_size + (n_process_x - grid_size % n_process_x);
+      int new_size_y = grid_size + (n_process_y - grid_size % n_process_y);
+      grid.padding(new_size_x, new_size_y);
+
+      // Calculate the number of columns and rows per process's grid
+      process_cols = new_size_x / n_process_x;
+      process_rows = new_size_y / n_process_y;
+      grid.reorganizeGrid(n_process_x, n_process_y); // Reorganize the grid for contiguous memory access when scattering
+    } else {
+      int new_size_x = grid_size;
+      int new_size_y = grid_size;
+
+      // Calculate the number of columns and rows per process's grid
+      process_cols = new_size_x / n_process_x;
+      process_rows = new_size_y / n_process_y;
+      grid.reorganizeGrid(n_process_x, n_process_y); // Reorganize the grid for contiguous memory access when scattering
+    }
+  }
+
+  // Broadcast process_cols and process_rows to all processes
+  MPI_Bcast(&process_cols, 1, MPI_INT, 0, cart_comm);
+  MPI_Bcast(&process_rows, 1, MPI_INT, 0, cart_comm);
+
+  Grid local_grid(process_rows, process_cols, 42); // Define a local grid for each process
+  int chunk_size = process_cols * process_rows;    // The size of each chunk to be scattered
 
   // Scatter the grid to all processes
-  // MPI_Scatter(grid.getGrid(), chunk_size * chunk_size, MPI_INT,
-  //             local_grid.getGrid(), chunk_size * chunk_size, MPI_INT, 0,
-  //             MPI_COMM_WORLD);
+  MPI_Scatter(grid.getGrid(), chunk_size, MPI_INT, local_grid.getGrid(),
+              chunk_size, MPI_INT, 0, cart_comm);
 
-  // Run the game for 50 time steps in parallel
-  // for (int time = 0; time < 50; ++time) {
-  //   // Communicate the boundary cells with the neighboring processes
-  //   // Halo exchange of size 1 is required -- also periodic boundary
-  //   conditions
+  // Create a convolution grid for each process
+  Grid conv_grid(process_rows, process_cols, 42);
+  for (int time = 0; time < time_steps; ++time) { // Run the game for 50 time steps in parallel
 
-  //   local_grid.communicateBoundary(rank, nranks);
+    // Deep copy the current local grid to the convolution grid
+    conv_grid.setGrid(local_grid.getGrid());
 
-  //   // Do a local update of the grid here
-  //   local_grid.updateGrid();
-  //   // MPI_Barrier(MPI_COMM_WORLD);
+    conv_grid.AddVerticalPadding(process_cols, process_rows); // Add vertical padding to the local grid
+    conv_grid.VerticalHaloExchange(rank, nranks, cart_comm);  // Communicate the vertical halo cells with the neighboring processes
+    MPI_Barrier(cart_comm);
+    conv_grid.VerticalConv(process_cols, process_rows); // Update the local grid using the vertical convolution
 
-  //   // To plot the local grid
-  //   if (rank == 20) {
-  //     std::cout << "Time Step " << time << std::endl;
-  //     std::cout << "____________________" << std::endl;
-  //     local_grid.printGrid();
-  //     std::cout << "____________________" << std::endl;
-  //     std::this_thread::sleep_for(
-  //         std::chrono::milliseconds(500));  // Delay for 500ms
-  //     system("clear");                      // Clear the console
+    MPI_Barrier(cart_comm); // Wait for all processes to finish communicating the vertical halo cells
+
+    conv_grid.AddHorizontalPadding(process_cols, process_rows); // Add horizontal padding to the local grid
+    conv_grid.HorizontalHaloExchange(rank, nranks, cart_comm);  // Communicate the horizontal halo cells with the neighboring processes
+    MPI_Barrier(cart_comm);
+    conv_grid.HorizontalConv(process_cols, process_rows); // Update the local grid using the horizontal convolution
+
+    MPI_Barrier(cart_comm); // Wait for all processes to finish communicating the horizontal halo cells
+
+    local_grid.ApplyGameRules(conv_grid); // Apply the game rules to the local grid
+
+    MPI_Barrier(cart_comm); // Wait for all processes to finish communicating the horizontal halo cells
+  }
+
+  // Gather the local grids to the global grid
+  MPI_Gather(local_grid.getGrid(), chunk_size, MPI_INT, grid.getGrid(),
+             chunk_size, MPI_INT, 0, cart_comm);
+
+  if (rank == 0) {
+
+    // Extract the original order of the grid
+    grid.inverseReorganizeGrid(n_process_x, n_process_y);
+
+    if (grid_size % n_process_x != 0 || grid_size % n_process_y != 0) {
+      // Undo the padding to get the original grid
+      grid.unpadGrid(grid_size);
+    }
+
+    // std::cout << "_______Rank___" << rank << std::endl;
+    // grid.printGrid();
+  }
+
+  MPI_Barrier(cart_comm); // Wait for all processes to finish gathering the local grids
+  MPI_Finalize();
+
+  // if (std::string(argv[3]) == "cache_blocking") {
+  //   // Cache blocking test
+
+  //   std::filesystem::create_directories("./graphs");
+  //   for (int blockSize = 1; blockSize <= 64; blockSize++) {
+  //     timing::start_clock(); // Start the clock
+  //     for (int time = 0; time < time_steps; ++time) {
+  //       grid.updateGridCache(blockSize);
+  //     }
+  //     double elapsed_time = timing::get_split(); // Stop the clock
+
+  //     // Path to save the time taken for different block sizes
+  //     std::string filepath = "./graphs/cache_blocking_time.txt";
+
+  //     std::ofstream file(filepath, std::ios::app); // Append to the file
+  //     if (file.is_open()) {
+  //       file << "Block size: " << blockSize << " Time: " << elapsed_time
+  //            << " ms" << std::endl;
+  //       file.close();
+  //     } else {
+  //       std::cerr << "Failed to open file at " << filepath << std::endl;
+  //     }
   //   }
   // }
 
-  // Gather the local grids to the global grid
-  // MPI_Gather(local_grid.getGrid(), chunk_size * chunk_size, MPI_INT,
-  //            grid.getGrid(), chunk_size * chunk_size, MPI_INT, 0,
-  //            MPI_COMM_WORLD);
-
-  // MPI_Finalize();
-
-  // Run the game for 50 time steps only for visualization
-  for (int time = 0; time < 50; ++time) {
-    std::cout << "Time Step " << time << std::endl;
-    std::cout << "____________________" << std::endl;
-    // grid.printGrid();
-    timing::start_clock();  // Start the clock
-    grid.updateGrid();
-    double elapsed_time = timing::get_split();  // Stop the clock
-    std::cout << "Time taken for updating the grid: " << elapsed_time << " ms"
-              << std::endl;
-    std::cout << "____________________" << std::endl;
-    // std::this_thread::sleep_for(
-    //     std::chrono::milliseconds(500));  // Delay for 500ms
-    // system("clear");                      // Clear the console
-  }
+  // else if (std::string(argv[3]) == "time") {
+  //   // Run the game for input time steps only for visualization
+  //   timing::start_clock(); // Start the clock
+  //   for (int time = 0; time < time_steps; ++time) {
+  //     std::cout << "Time Step " << time << std::endl;
+  //     std::cout << "____________________" << std::endl;
+  //     grid.updateGridConvolve();
+  //   }
+  //   double elapsed_time = timing::get_split(); // Stop the clock
+  //   std::cout << "Time taken for updating grid of size " << grid_size << "x"
+  //             << grid_size << " over " << time_steps
+  //             << " time steps is: " << elapsed_time << " ms"
+  //             << std::endl; // Print the elapsed time
+  // }
 
   return 0;
 }
