@@ -4,6 +4,6 @@
 namespace timing {
 void start_clock();
 double get_split();
-}  // namespace timing
+} // namespace timing
 
-#endif  // TIMING_H
+#endif // TIMING_H

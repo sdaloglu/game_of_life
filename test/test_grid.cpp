@@ -79,7 +79,7 @@ TEST(GridTests, UpdateGridCorrectly) {
     Grid grid_block(5, 5, 42);
     grid_block.setGrid(block);
     for (int time=0; time < 30; time++){
-        grid_block.updateGrid();  // Update the grid 30 times
+        grid_block.updateGridCounting();  // Update the grid 30 times
     }
     int* block_ptr = grid_block.getGrid();
     for (int i = 0; i < 25; i++){
@@ -98,7 +98,7 @@ TEST(GridTests, UpdateGridCorrectly) {
     Grid grid_beehive(5, 5, 42);
     grid_beehive.setGrid(beehive);
     for (int time=0; time < 30; time++){
-        grid_beehive.updateGrid();  // Update the grid 30 times
+        grid_beehive.updateGridCounting();  // Update the grid 30 times
     }
     int* beehive_ptr = grid_beehive.getGrid();
     for (int i = 0; i < 25; i++){
@@ -117,7 +117,7 @@ TEST(GridTests, UpdateGridCorrectly) {
     Grid grid_loaf(6, 6, 42);
     grid_loaf.setGrid(loaf);
     for (int time=0; time < 30; time++){
-        grid_loaf.updateGrid();  // Update the grid 30 times
+        grid_loaf.updateGridCounting();  // Update the grid 30 times
     }
     int* loaf_ptr = grid_loaf.getGrid();
     for (int i = 0; i < 36; i++){
@@ -135,7 +135,7 @@ TEST(GridTests, UpdateGridCorrectly) {
     Grid grid_boat(5, 5, 42);
     grid_boat.setGrid(boat);
     for (int time=0; time < 30; time++){
-        grid_boat.updateGrid();  // Update the grid 30 times
+        grid_boat.updateGridCounting();  // Update the grid 30 times
     }
     int* boat_ptr = grid_boat.getGrid();
     for (int i = 0; i < 25; i++){
@@ -152,7 +152,7 @@ TEST(GridTests, UpdateGridCorrectly) {
     Grid grid_tub(5, 5, 42);
     grid_tub.setGrid(tub);
     for (int time=0; time < 30; time++){
-        grid_tub.updateGrid();  // Update the grid 30 times
+        grid_tub.updateGridCounting();  // Update the grid 30 times
     }
     int* tub_ptr = grid_tub.getGrid();
     for (int i = 0; i < 25; i++){
@@ -164,12 +164,12 @@ TEST(GridTests, UpdateGridCorrectly) {
 
     // Checking Oscillators
 
-    int blinker1[25] = {0, 0, 0, 0,    // This is an example of an oscillator called Blinker
+    int blinker1[20] = {0, 0, 0, 0,    // This is an example of an oscillator called Blinker
                         0, 1, 0, 0,
                         0, 1, 0, 0,
                         0, 1, 0, 0,
                         0, 0, 0, 0};
-    int blinker2[25] = {0, 0, 0, 0,    // This is what the grid should look like after odd number of updates
+    int blinker2[20] = {0, 0, 0, 0,    // This is what the grid should look like after odd number of updates
                         0, 0, 0, 0,
                         1, 1, 1, 0,
                         0, 0, 0, 0,
@@ -177,7 +177,7 @@ TEST(GridTests, UpdateGridCorrectly) {
     Grid grid_blinker(5, 4, 42);
     grid_blinker.setGrid(blinker1);
     for (int time=0; time < 15; time++){
-        grid_blinker.updateGrid();  // Update the grid 30 times
+        grid_blinker.updateGridCounting();  // Update the grid 30 times
     }
     int* blinker_ptr = grid_blinker.getGrid();
     for (int i = 0; i < 20; i++){
@@ -187,7 +187,7 @@ TEST(GridTests, UpdateGridCorrectly) {
     }
 
     // Update the blinker one more time to check if it returns to the original state
-    grid_blinker.updateGrid();
+    grid_blinker.updateGridCounting();
     int* blinker_ptr2 = grid_blinker.getGrid();
     for (int i = 0; i < 20; i++){
         bool isCorrect = blinker1[i] == blinker_ptr2[i];
