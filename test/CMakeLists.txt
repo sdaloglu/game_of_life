@@ -29,7 +29,7 @@ message(STATUS "MPI Include Path: ${MPI_C_INCLUDE_PATH}")  # Debugging
 # Link the test executable with the grid, gtest and MPI libraries
 target_link_libraries(test_grid 
             PRIVATE libgrid
-            PRIVATE MPI::MPI_CXX
+            MPI::MPI_CXX
             GTest::gtest_main)
 
 message(STATUS "MPI Libraries: ${MPI_C_LIBRARIES}")  # Debugging
