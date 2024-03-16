@@ -5,6 +5,7 @@ add_subdirectory(timing)
 # Creating a library for grid.cpp
 add_library(libgrid
     grid.cpp
+    grid_utils.cpp
 )
 target_include_directories(libgrid
     PUBLIC
