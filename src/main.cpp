@@ -9,13 +9,13 @@
  *
  */
 
+#include "grid.h"
+#include "grid_utils.h"
+#include "timing.h"
 #include <chrono>
 #include <fstream>
 #include <iostream> //for input and output
 #include <thread>
-
-#include "grid.h"
-#include "timing.h"
 
 /**
  * @brief The main function for the Conway's Game of Life with periodic boundary
@@ -40,18 +40,13 @@ int main(int argc, char *argv[]) {
   // grid) of size Size 10x10 This could also be a user input file containing a
   // square grid
 
-  int beehive[25] = {0, 0, 0, 0, 0, // This is an example of a still life called Beehive
-                     0, 0, 1, 1, 0,
-                     0, 1, 0, 0, 1,
-                     0, 0, 1, 1, 0,
-                     0, 0, 0, 0, 0};
-  int blinker[25] = {0, 0, 0, 0, 0, // This is an example of a still life called Beehive
-                     0, 0, 0, 0, 0,
-                     0, 1, 1, 1, 0,
-                     0, 0, 0, 0, 0,
-                     0, 0, 0, 0, 0};
-  Grid grid(grid_size, grid_size, 42);
-  // grid.setGrid(beehive);
+  // Grid grid(grid_size, grid_size, 42);
+
+  std::string path = "./grids/";
+  std::string filename = argv[3];
+  std::string filepath = path + filename;
+  Grid grid = readGridFromFile(filepath);
+  int grid_size = grid.getSize();   // Input must be a square grid, size is both for rows and columns
 
   MPI_Comm cart_comm; // Define a new communicator for the 2D grid of processes
   // Using the Cartesian Communicator to create a 2D grid of processes
@@ -65,7 +60,10 @@ int main(int argc, char *argv[]) {
   MPI_Dims_create(nranks, 2, dims);                                       // Determine the number of processes in each dimension
   MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, reorder, &cart_comm); // Create a 2D Cartesian communicator
   MPI_Cart_get(cart_comm, 2, dims, periods, coords);                      // Get the dimensions and coordinates of the Cartesian communicator
-
+  // print dimensions
+  if (rank == 0) {
+    std::cout << "The grid is divided into " << dims[0] << "x" << dims[1] << " processes" << std::endl;
+  }
   int n_process_x = dims[0];
   int n_process_y = dims[1];
   int process_cols, process_rows;
@@ -82,6 +80,8 @@ int main(int argc, char *argv[]) {
       process_cols = new_size_x / n_process_x;
       process_rows = new_size_y / n_process_y;
       grid.reorganizeGrid(n_process_x, n_process_y); // Reorganize the grid for contiguous memory access when scattering
+
+      std::cout << "HERE" << std::endl;
     } else {
       int new_size_x = grid_size;
       int new_size_y = grid_size;
@@ -113,6 +113,7 @@ int main(int argc, char *argv[]) {
 
     conv_grid.AddVerticalPadding(process_cols, process_rows); // Add vertical padding to the local grid
     conv_grid.VerticalHaloExchange(rank, nranks, cart_comm);  // Communicate the vertical halo cells with the neighboring processes
+
     MPI_Barrier(cart_comm);
     conv_grid.VerticalConv(process_cols, process_rows); // Update the local grid using the vertical convolution
 
@@ -120,6 +121,7 @@ int main(int argc, char *argv[]) {
 
     conv_grid.AddHorizontalPadding(process_cols, process_rows); // Add horizontal padding to the local grid
     conv_grid.HorizontalHaloExchange(rank, nranks, cart_comm);  // Communicate the horizontal halo cells with the neighboring processes
+
     MPI_Barrier(cart_comm);
     conv_grid.HorizontalConv(process_cols, process_rows); // Update the local grid using the horizontal convolution
 
@@ -144,8 +146,8 @@ int main(int argc, char *argv[]) {
       grid.unpadGrid(grid_size);
     }
 
-    // std::cout << "_______Rank___" << rank << std::endl;
-    // grid.printGrid();
+    std::cout << "_______Rank___" << rank << std::endl;
+    grid.printGrid();
   }
 
   MPI_Barrier(cart_comm); // Wait for all processes to finish gathering the local grids
