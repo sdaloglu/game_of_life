@@ -96,7 +96,6 @@ void Grid::setGrid(const int *initialGrid) {
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-
 int Grid::getSize() const { return size1; }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -247,37 +246,41 @@ void Grid::printGrid() {
  *
  * @param nranks int, the number of processes
  */
-void Grid::reorganizeGrid(int n_process_x, int n_process_y) {
+void Grid::reorganizeGrid(int n_process_x, int n_process_y, int grid_size) {
   int *new_grid = new int[size1 * size2]; // Allocate memory for the new grid
 
-  // Calculate the size of the each process's grid
-  int process_cols =
-      size2 / n_process_x; // Number of columns in each process's grid
-  int process_rows =
-      size1 / n_process_y; // Number of rows in each process's grid
+  int full_rows = size1 / n_process_x;
+  int remaining_rows = size1 % n_process_x;
+  int full_cols = size2 / n_process_y;
+  int remaining_cols = size2 % n_process_y;
 
-  // Number of elements in each chunk to be scattered
-  int chunk_size = process_cols * process_rows;
+  int current_chunk_start = 0; // Start index of the current chunk in new_grid
 
-  // Reorganize the grid so that each chunk to be scattered is contiguous in
-  // memory
-  for (int proc_y = 0; proc_y < n_process_y;
-       ++proc_y) { // Iterate through each row of processes
-    for (int proc_x = 0; proc_x < n_process_x;
-         ++proc_x) { // Iterate through each column of processes
-      // Iterate through each cell in the process's grid
-      for (int row = 0; row < process_rows; ++row) {
-        for (int col = 0; col < process_cols; ++col) {
-          int global_row = proc_y * process_rows + row;
-          int global_col = proc_x * process_cols + col;
+  for (int proc_x = 0; proc_x < n_process_x; ++proc_x) {
+    int proc_rows = (proc_x < n_process_x - 1) ? full_rows : full_rows + (remaining_rows > 0 ? remaining_rows : 0); // Adjust for remaining rows
+
+    for (int proc_y = 0; proc_y < n_process_y; ++proc_y) {
+      int proc_cols = (proc_y < n_process_y - 1) ? full_cols : full_cols + (remaining_cols > 0 ? remaining_cols : 0); // Adjust for remaining cols
+
+      for (int row = 0; row < proc_rows; ++row) {
+        for (int col = 0; col < proc_cols; ++col) {
+          int global_row = proc_x * full_rows + row;
+          int global_col = proc_y * full_cols + col;
+
+          if (proc_x == n_process_x - 1 && row >= full_rows) {
+            global_row = size1 - proc_rows + row; // Start from the last remaining rows
+          }
+          if (proc_y == n_process_y - 1 && col >= full_cols) {
+            global_col = size2 - proc_cols + col; // Start from the last remaining cols
+          }
+
           int index_in_global = global_row * size2 + global_col;
+          int index_in_chunk = row * proc_cols + col;
 
-          int index_in_chunk = row * process_cols + col;
-          int chunk_start_index = (proc_y * n_process_x + proc_x) * chunk_size;
-
-          new_grid[chunk_start_index + index_in_chunk] = grid[index_in_global];
+          new_grid[current_chunk_start + index_in_chunk] = grid[index_in_global];
         }
       }
+      current_chunk_start += proc_rows * proc_cols; // Move to the start of the next chunk
     }
   }
 
@@ -285,69 +288,69 @@ void Grid::reorganizeGrid(int n_process_x, int n_process_y) {
   delete[] grid;
 
   // Swap the old grid with the new grid
-  std::swap(grid, new_grid);
-};
+  grid = new_grid;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
+void Grid::inverseReorganizeGrid(int n_process_x, int n_process_y, int grid_size) {
 
-void Grid::inverseReorganizeGrid(int n_process_x, int n_process_y) {
-  int *original_grid =
-      new int[size1 * size2]; // Allocate memory for the new grid
+  int *original_grid = new int[grid_size * grid_size]; // Allocate memory for the original grid
 
-  // Calculate the size of the each process's grid
-  int process_cols =
-      size2 / n_process_x; // Number of columns in each process's grid
-  int process_rows =
-      size1 / n_process_y; // Number of rows in each process's grid
+  int full_rows = grid_size / n_process_x;      // Full rows per process
+  int remaining_rows = grid_size % n_process_x; // Extra rows for the last row of processes
+  int full_cols = grid_size / n_process_y;      // Full columns per process
+  int remaining_cols = grid_size % n_process_y; // Extra columns for the last column of processes
 
-  // Number of elements in each chunk to be scattered
-  int chunk_size = process_cols * process_rows;
+  int chunk_start_index = 0; // Start index of the current chunk in the reorganized grid
 
-  // Iterate over the grid that is contiguous in memory for each process
-  for (int proc_y = 0; proc_y < n_process_y;
-       ++proc_y) { // Iterate through each row of processes
-    for (int proc_x = 0; proc_x < n_process_x;
-         ++proc_x) { // Iterate through each column of processes
-      // Iterate through each cell in the process's grid
-      for (int row = 0; row < process_rows; ++row) {
-        for (int col = 0; col < process_cols; ++col) {
-          int global_row = proc_y * process_rows + row;
-          int global_col = proc_x * process_cols + col;
-          int index_in_global = global_row * size2 + global_col;
+  for (int proc_x = 0; proc_x < n_process_x; ++proc_x) {
+    for (int proc_y = 0; proc_y < n_process_y; ++proc_y) {
+      int proc_rows = (proc_x < n_process_x - 1) ? full_rows : full_rows + remaining_rows; // Rows for the current process
+      int proc_cols = (proc_y < n_process_y - 1) ? full_cols : full_cols + remaining_cols; // Cols for the current process
 
-          int index_in_chunk = row * process_cols + col;
-          int chunk_start_index = (proc_y * n_process_x + proc_x) * chunk_size;
+      for (int row = 0; row < proc_rows; ++row) {
+        for (int col = 0; col < proc_cols; ++col) {
+          int global_row = proc_x * full_rows + row;
+          int global_col = proc_y * full_cols + col;
 
-          original_grid[index_in_global] =
-              grid[chunk_start_index + index_in_chunk];
+          if (proc_x == n_process_x - 1 && remaining_rows > 0 && row >= full_rows) {
+            global_row = grid_size - remaining_rows + (row - full_rows);
+          }
+
+          if (proc_y == n_process_y - 1 && remaining_cols > 0 && col >= full_cols) {
+            global_col = grid_size - remaining_cols + (col - full_cols);
+          }
+
+          int index_in_original = global_row * grid_size + global_col; // Index in the original, row-major ordered grid
+          int index_in_chunk = row * proc_cols + col;                  // Index within the current chunk
+
+          original_grid[index_in_original] = grid[chunk_start_index + index_in_chunk];
         }
       }
+      chunk_start_index += proc_rows * proc_cols; // Move to the start of the next chunk
     }
   }
 
-  // Delete the old grid
-  delete[] grid;
-
-  // Swap the old grid with the new grid
-  std::swap(grid, original_grid);
-};
+  delete[] grid;        // Free the old, reorganized grid
+  grid = original_grid; // Replace it with the original grid
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-void Grid::AddVerticalPadding(int process_cols, int process_rows) {
+void Grid::AddVerticalPadding() {
   // Add vertical padding to the grid
-  int *padded_grid = new int[(process_rows + 2) * process_cols]; // Allocate memory for the new grid
+  int *padded_grid = new int[(size1 + 2) * size2]; // Allocate memory for the new grid
 
   // Initialize the top and bottom halo rows to 0
-  std::fill_n(padded_grid, process_cols, 0);
-  std::fill_n(&padded_grid[(process_rows + 1) * process_cols], process_cols, 0);
+  std::fill_n(padded_grid, size2, 0);
+  std::fill_n(&padded_grid[(size1 + 1) * size2], size2, 0);
 
   // Fill the new grid with the old grid plus the vertical padding
-  for (int i = 0; i < process_rows; ++i) {
-    for (int j = 0; j < process_cols; ++j) {
-      padded_grid[(i + 1) * process_cols + j] = grid[i * process_cols + j];
+  for (int i = 0; i < size1; ++i) {
+    for (int j = 0; j < size2; ++j) {
+      padded_grid[(i + 1) * size2 + j] = grid[i * size2 + j];
     }
   }
 
@@ -357,8 +360,8 @@ void Grid::AddVerticalPadding(int process_cols, int process_rows) {
   grid = padded_grid;
 
   // Update the size attributes of the grid
-  size1 = process_rows + 2;
-  size2 = process_cols;
+  size1 = size1 + 2;
+  size2 = size2;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -395,20 +398,20 @@ void Grid::VerticalHaloExchange(int rank, int ranks, MPI_Comm cart_comm) {
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-void Grid::AddHorizontalPadding(int process_cols, int process_rows) {
+void Grid::AddHorizontalPadding() {
   // Add horizontal padding to the grid
-  int *padded_grid = new int[process_rows * (process_cols + 2)]; // Allocate memory for the new grid
+  int *padded_grid = new int[size1 * (size2 + 2)]; // Allocate memory for the new grid
 
   // Initialize the left and right halo columns to 0
-  for (int i = 0; i < process_rows; ++i) {
-    padded_grid[i * (process_cols + 2)] = 0; // Leftmost column
+  for (int i = 0; i < size1; ++i) {
+    padded_grid[i * (size2 + 2)] = 0; // Leftmost column
 
     // Copy the original grid to the new grid
-    for (int j = 0; j < process_cols; ++j) {
-      padded_grid[i * (process_cols + 2) + (j + 1)] = grid[i * process_cols + j];
+    for (int j = 0; j < size2; ++j) {
+      padded_grid[i * (size2 + 2) + (j + 1)] = grid[i * size2 + j];
     }
 
-    padded_grid[i * (process_cols + 2) + process_cols + 1] = 0; // Rightmost column
+    padded_grid[i * (size2 + 2) + size2 + 1] = 0; // Rightmost column
   }
   // Delete the old grid
   delete[] grid;
@@ -416,8 +419,8 @@ void Grid::AddHorizontalPadding(int process_cols, int process_rows) {
   grid = padded_grid;
 
   // Update the size attributes of the grid
-  size1 = process_rows;
-  size2 = process_cols + 2;
+  size1 = size1;
+  size2 = size2 + 2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -463,22 +466,22 @@ void Grid::HorizontalHaloExchange(int rank, int ranks, MPI_Comm cart_comm) {
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-void Grid::VerticalConv(int process_cols, int process_rows) {
+void Grid::VerticalConv() {
   // This function will be called on vertically padded grids
   // It will perform the vertical convolution that will shrink the padded grid
   // into the original size
 
-  int *vertical_sum_array = new int[process_cols * process_rows]; // Allocate memory for the new grid
+  int *vertical_sum_array = new int[size2 * (size1 - 2)]; // Allocate memory for the new grid
 
-  for (int i = 0; i < process_rows; ++i) {
-    for (int j = 0; j < process_cols; ++j) {
+  for (int i = 0; i < (size1 - 2); ++i) {
+    for (int j = 0; j < size2; ++j) {
       int sum = 0;
       for (int dx = -1; dx <= 1; ++dx) {
         int x_neighbour = (i + dx) + 1; // adjust the index to account for the padding
 
-        sum += grid[x_neighbour * process_cols + j];
+        sum += grid[x_neighbour * size2 + j];
       }
-      vertical_sum_array[i * process_cols + j] = sum;
+      vertical_sum_array[i * size2 + j] = sum;
     }
   }
 
@@ -488,30 +491,30 @@ void Grid::VerticalConv(int process_cols, int process_rows) {
   grid = vertical_sum_array;
 
   // Update the vertically reduced size of the grid
-  size1 = process_rows;
-  size2 = process_cols;
+  size1 = (size1 - 2);
+  size2 = size2;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-void Grid::HorizontalConv(int process_cols, int process_rows) {
+void Grid::HorizontalConv() {
   // This function will be called on horizontally padded grids
   // It will perform the horizontal convolution that will shrink the padded grid
   // into the original size
 
-  int *horizontal_sum_array = new int[process_cols * process_rows]; // Allocate memory for the new grid
+  int *horizontal_sum_array = new int[(size2 - 2) * size1]; // Allocate memory for the new grid
 
   // Convolution with no padding
-  for (int i = 0; i < process_rows; ++i) {
-    for (int j = 0; j < process_cols; ++j) {
+  for (int i = 0; i < size1; ++i) {
+    for (int j = 0; j < (size2 - 2); ++j) {
       int sum = 0;
       for (int dy = -1; dy <= 1; ++dy) {
         int y_neighbour = (j + dy) + 1; // adjust the index to account for the padding
 
-        sum += grid[i * (process_cols + 2) + y_neighbour];
+        sum += grid[i * ((size2 - 2) + 2) + y_neighbour];
       }
-      horizontal_sum_array[i * process_cols + j] = sum;
+      horizontal_sum_array[i * (size2 - 2) + j] = sum;
     }
   }
 
@@ -521,8 +524,8 @@ void Grid::HorizontalConv(int process_cols, int process_rows) {
   grid = horizontal_sum_array;
 
   // Update the horizontally reduced size of the grid
-  size1 = process_rows;
-  size2 = process_cols;
+  size1 = size1;
+  size2 = (size2 - 2);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
