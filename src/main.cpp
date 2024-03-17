@@ -33,20 +33,30 @@ int main(int argc, char *argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &nranks);
 
-  // int grid_size = std::stoi(argv[1]);  // Size of the grid, must be a square
-  int time_steps = std::stoi(argv[1]); // Number of time steps to evolve the grid
-
   // Generate the initial state of the game -- random binary matrix (square
   // grid) of size Size 10x10 This could also be a user input file containing a
   // square grid
 
-  // Grid grid(grid_size, grid_size, 42);
+  int grid_size; // Declare the size of the outside the if-else block
+  Grid grid;     // Declare the grid
+  // Check if the second argument ends with .txt
+  if (std::string(argv[1]).substr(std::string(argv[1]).find_last_of(".") + 1) == "txt") {
+    // Input is a txt file containing a square grid (hopefully)
+    std::cout << "Reading grid from file" << std::endl;
+    std::string filename = argv[1];
+    std::string path = "./grids/";
+    std::string filepath = path + filename;
+    grid = readGridFromFile(filepath);
+    grid_size = grid.getSize(); // Input must be a square grid, size is both for rows and columns
 
-  std::string path = "./grids/";
-  std::string filename = argv[2];
-  std::string filepath = path + filename;
-  Grid grid = readGridFromFile(filepath);
-  int grid_size = grid.getSize(); // Input must be a square grid, size is both for rows and columns
+  } else {
+    // Input is the size of the grid, we will generate a random grid
+    std::cout << "Generating random grid with size " << argv[1] << "x" << argv[1] << std::endl;
+    grid_size = std::stoi(argv[1]); // Size of the grid, must be a square
+    grid = Grid(grid_size, grid_size, 42);
+  }
+
+  int time_steps = std::stoi(argv[2]); // Number of time steps to evolve the grid
 
   MPI_Comm cart_comm; // Define a new communicator for the 2D grid of processes
   // Using the Cartesian Communicator to create a 2D grid of processes
