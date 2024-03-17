@@ -2,12 +2,7 @@
 #include "grid.h"
 #include <fstream>
 #include <iostream>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
-#include <fstream>
-#include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -23,9 +18,12 @@ Grid readGridFromFile(const std::string &filename) {
   while (std::getline(file, line)) {
     std::string processedLine;
     for (char c : line) {
-      if (c == '0' || c == '1') {
-        processedLine += c;
+      if (c != '0' && c != '1') {
+        std::ostringstream message;
+        message << "Invalid character '" << c << "' detected in grid. Only '0' or '1' are allowed.";
+        throw std::runtime_error(message.str());
       }
+      processedLine += c;
     }
     if (!processedLine.empty()) {
       lines.push_back(processedLine);
@@ -40,7 +38,7 @@ Grid readGridFromFile(const std::string &filename) {
   size_t expectedSize = lines[0].size();
   for (const auto &l : lines) {
     if (l.size() != expectedSize) {
-      throw std::runtime_error("Input grid rows are not of equal length.");
+      throw std::runtime_error("Input grid is not a square. All rows must be of the same length.");
     }
   }
 
