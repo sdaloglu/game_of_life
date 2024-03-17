@@ -33,8 +33,8 @@ int main(int argc, char *argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &nranks);
 
-  int grid_size = std::stoi(argv[1]);  // Size of the grid, must be a square
-  int time_steps = std::stoi(argv[2]); // Number of time steps to evolve the grid
+  // int grid_size = std::stoi(argv[1]);  // Size of the grid, must be a square
+  int time_steps = std::stoi(argv[1]); // Number of time steps to evolve the grid
 
   // Generate the initial state of the game -- random binary matrix (square
   // grid) of size Size 10x10 This could also be a user input file containing a
@@ -43,10 +43,10 @@ int main(int argc, char *argv[]) {
   // Grid grid(grid_size, grid_size, 42);
 
   std::string path = "./grids/";
-  std::string filename = argv[3];
+  std::string filename = argv[2];
   std::string filepath = path + filename;
   Grid grid = readGridFromFile(filepath);
-  int grid_size = grid.getSize();   // Input must be a square grid, size is both for rows and columns
+  int grid_size = grid.getSize(); // Input must be a square grid, size is both for rows and columns
 
   MPI_Comm cart_comm; // Define a new communicator for the 2D grid of processes
   // Using the Cartesian Communicator to create a 2D grid of processes
@@ -67,63 +67,91 @@ int main(int argc, char *argv[]) {
   int n_process_x = dims[0];
   int n_process_y = dims[1];
   int process_cols, process_rows;
-
+  int remaining_rows, remaining_cols, full_rows, full_cols = 0;
+  int *sendcounts = new int[nranks];
+  int *displs = new int[nranks];
   if (rank == 0) {
 
-    // Checking if the grid requires padding for the scatter
-    if (grid_size % n_process_x != 0 || grid_size % n_process_y != 0) {
-      int new_size_x = grid_size + (n_process_x - grid_size % n_process_x);
-      int new_size_y = grid_size + (n_process_y - grid_size % n_process_y);
-      grid.padding(new_size_x, new_size_y);
+    // Instead of padding the grid give the remaining rows and columns to the last processes
 
-      // Calculate the number of columns and rows per process's grid
-      process_cols = new_size_x / n_process_x;
-      process_rows = new_size_y / n_process_y;
-      grid.reorganizeGrid(n_process_x, n_process_y); // Reorganize the grid for contiguous memory access when scattering
+    // (n_process_x - 1) * n_process_y is the number of processes that will have full rows: full_rows
+    full_rows = grid_size / n_process_x;
+    // n_process_y number of processes will have the remaining rows: remaining_rows
+    remaining_rows = grid_size % n_process_x;
 
-      std::cout << "HERE" << std::endl;
-    } else {
-      int new_size_x = grid_size;
-      int new_size_y = grid_size;
+    // (n_process_y - 1) * n_process_x is the number of processes that will have full columns: full_cols
+    full_cols = grid_size / n_process_y;
+    // n_process_x number of processes will have the remaining columns: remaining_cols
+    remaining_cols = grid_size % n_process_y;
 
-      // Calculate the number of columns and rows per process's grid
-      process_cols = new_size_x / n_process_x;
-      process_rows = new_size_y / n_process_y;
-      grid.reorganizeGrid(n_process_x, n_process_y); // Reorganize the grid for contiguous memory access when scattering
+    // Fill the sendcounts array based on the fact that the last columns and rows of the the process grid will have the remaining rows and columns
+    // The rest of the processes will have full rows and columns
+    // The number of processes with the remaining rows and columns is n_process_x + n_process_y - 1
+    for (int i = 0; i < n_process_x; ++i) {
+      for (int j = 0; j < n_process_y; ++j) {
+        // Determine the number of rows for the current process
+        int rows_for_process = (i < n_process_x - 1) ? full_rows : full_rows + remaining_rows;
+        // Determine the number of columns for the current process
+        int cols_for_process = (j < n_process_y - 1) ? full_cols : full_cols + remaining_cols;
+
+        // Calculate the sendcount for the current process
+        sendcounts[i * n_process_y + j] = rows_for_process * cols_for_process;
+      }
+    }
+
+    // Creating displs array for MPI_Scatterv
+    int disp = 0;
+    for (int i = 0; i < nranks; i++) {
+      displs[i] = disp;
+      disp += sendcounts[i];
     }
   }
 
-  // Broadcast process_cols and process_rows to all processes
-  MPI_Bcast(&process_cols, 1, MPI_INT, 0, cart_comm);
-  MPI_Bcast(&process_rows, 1, MPI_INT, 0, cart_comm);
+  grid.reorganizeGrid(n_process_x, n_process_y, grid_size); // Reorganize the grid for contiguous memory access when scattering
 
-  Grid local_grid(process_rows, process_cols, 42); // Define a local grid for each process
-  int chunk_size = process_cols * process_rows;    // The size of each chunk to be scattered
+  // Broadast remaining rows and columns to all processes
+  MPI_Bcast(&remaining_rows, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&remaining_cols, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  // Broadcast full rows and columns to all processes
+  MPI_Bcast(&full_rows, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&full_cols, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  // Boradcast the sendcounts and displs to all processes
+  MPI_Bcast(sendcounts, nranks, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(displs, nranks, MPI_INT, 0, MPI_COMM_WORLD);
 
+  // Determine local grid size for each process
+  int local_rows = (coords[0] == dims[0] - 1 && remaining_rows > 0) ? full_rows + remaining_rows : full_rows;
+  int local_cols = (coords[1] == dims[1] - 1 && remaining_cols > 0) ? full_cols + remaining_cols : full_cols;
+
+  // Create a local grid for each process
+  Grid local_grid(local_rows, local_cols, 42);
+  // Determine the recvcount for the local grid
+  int recvcount = local_rows * local_cols;
   // Scatter the grid to all processes
-  MPI_Scatter(grid.getGrid(), chunk_size, MPI_INT, local_grid.getGrid(),
-              chunk_size, MPI_INT, 0, cart_comm);
+
+  MPI_Scatterv(rank == 0 ? grid.getGrid() : nullptr, sendcounts, displs, MPI_INT, local_grid.getGrid(), recvcount, MPI_INT, 0, cart_comm);
 
   // Create a convolution grid for each process
-  Grid conv_grid(process_rows, process_cols, 42);
+  Grid conv_grid(local_rows, local_cols, 42);
+
   for (int time = 0; time < time_steps; ++time) { // Run the game for 50 time steps in parallel
 
     // Deep copy the current local grid to the convolution grid
     conv_grid.setGrid(local_grid.getGrid());
+    conv_grid.AddVerticalPadding(); // Add vertical padding to the local grid
 
-    conv_grid.AddVerticalPadding(process_cols, process_rows); // Add vertical padding to the local grid
-    conv_grid.VerticalHaloExchange(rank, nranks, cart_comm);  // Communicate the vertical halo cells with the neighboring processes
+    conv_grid.VerticalHaloExchange(rank, nranks, cart_comm); // Communicate the vertical halo cells with the neighboring processes
 
     MPI_Barrier(cart_comm);
-    conv_grid.VerticalConv(process_cols, process_rows); // Update the local grid using the vertical convolution
+    conv_grid.VerticalConv(); // Update the local grid using the vertical convolution
 
     MPI_Barrier(cart_comm); // Wait for all processes to finish communicating the vertical halo cells
 
-    conv_grid.AddHorizontalPadding(process_cols, process_rows); // Add horizontal padding to the local grid
-    conv_grid.HorizontalHaloExchange(rank, nranks, cart_comm);  // Communicate the horizontal halo cells with the neighboring processes
+    conv_grid.AddHorizontalPadding();                          // Add horizontal padding to the local grid
+    conv_grid.HorizontalHaloExchange(rank, nranks, cart_comm); // Communicate the horizontal halo cells with the neighboring processes
 
     MPI_Barrier(cart_comm);
-    conv_grid.HorizontalConv(process_cols, process_rows); // Update the local grid using the horizontal convolution
+    conv_grid.HorizontalConv(); // Update the local grid using the horizontal convolution
 
     MPI_Barrier(cart_comm); // Wait for all processes to finish communicating the horizontal halo cells
 
@@ -132,19 +160,18 @@ int main(int argc, char *argv[]) {
     MPI_Barrier(cart_comm); // Wait for all processes to finish communicating the horizontal halo cells
   }
 
+  // Create a global grid to gather the local grids
+  // if(rank == 0){
+  //   global_grid = Grid(grid_size, grid_size, 42);
+  // }
   // Gather the local grids to the global grid
-  MPI_Gather(local_grid.getGrid(), chunk_size, MPI_INT, grid.getGrid(),
-             chunk_size, MPI_INT, 0, cart_comm);
+
+  MPI_Gatherv(local_grid.getGrid(), recvcount, MPI_INT, grid.getGrid(), sendcounts, displs, MPI_INT, 0, cart_comm);
 
   if (rank == 0) {
 
     // Extract the original order of the grid
-    grid.inverseReorganizeGrid(n_process_x, n_process_y);
-
-    if (grid_size % n_process_x != 0 || grid_size % n_process_y != 0) {
-      // Undo the padding to get the original grid
-      grid.unpadGrid(grid_size);
-    }
+    grid.inverseReorganizeGrid(n_process_x, n_process_y, grid_size);
 
     std::cout << "_______Rank___" << rank << std::endl;
     grid.printGrid();
@@ -193,5 +220,8 @@ int main(int argc, char *argv[]) {
   //             << std::endl; // Print the elapsed time
   // }
 
+  // Delete the sendcounts and displs arrays
+  delete[] sendcounts;
+  delete[] displs;
   return 0;
 }
