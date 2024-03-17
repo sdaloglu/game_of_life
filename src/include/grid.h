@@ -9,6 +9,9 @@
 // Declaring a class for initializing the grid and updating the grid
 class Grid {
 public:
+  // Declaring a default constructor for the grid
+  Grid();
+
   // Declaring a constructor for the grid
   Grid(int size1, int size2, int seed);
 
@@ -17,6 +20,9 @@ public:
 
   // Define a function to get the pointer to the grid
   int *getGrid() const;
+
+  // Declaring a copy constructor for the grid
+  Grid &operator=(const Grid &other);
 
   // Define an indexing function to access the elements of the grid (by using 2D
   // index convention)
