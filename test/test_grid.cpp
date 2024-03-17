@@ -234,3 +234,224 @@ TEST(GridTests, PrintGrid){
 
 
 // Add tests for MPI functions here --> communicateBoundary and reorganizeGrid
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+TEST(GridTest, ReorganizingGrid){
+
+    // Writing a test for the reorganizeGrid function
+
+    int grid_size = 5;
+    int n_process_x = 3;  // Number of processes in the vertical direction
+    int n_process_y = 1;  // Number of processes in the horizontal direction
+
+    // example grid to be reorganized
+    int actual_grid[25] = {1, 0, 0, 0, 0,
+                            0, 1, 1, 0, 0,
+                            1, 1, 0, 0, 0,
+                            0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0};
+
+    // Initialize the grid with the example grid
+    Grid grid_actual(grid_size, grid_size, 42);
+    grid_actual.setGrid(actual_grid); 
+
+    // Reorganize the grid
+    grid_actual.reorganizeGrid(n_process_x, n_process_y,grid_size);
+
+    // The expected grid after reorganization
+    int expected_grid[25] = {1, 0, 0, 0, 0,  // This row is sent to process 0
+                            0, 1, 1, 0, 0,  // This row is sent to process 1
+                            1, 1, 0, 0, 0,  // This row and all above are sent to process 2
+                            0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0};
+
+    int* grid_ptr = grid_actual.getGrid();
+    for (int i = 0; i < grid_size*grid_size; i++){
+        bool isCorrect = grid_ptr[i] == expected_grid[i];
+        ASSERT_TRUE(isCorrect)<< "Mismatch at row " << i/grid_size << " and column " << i%grid_size;
+    }
+
+
+    int n_process_x2 = 2;  // Number of processes in the vertical direction
+    int n_process_y2 = 2;  // Number of processes in the horizontal direction
+    // example grid to be reorganized
+    int actual_grid2[25] = {1, 0, 0, 0, 0,
+                            0, 1, 1, 0, 0,
+                            1, 1, 0, 0, 0,
+                            0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0};
+    Grid grid_actual2(grid_size, grid_size, 42);
+    grid_actual2.setGrid(actual_grid2);
+
+    // Reorganize the grid
+    grid_actual2.reorganizeGrid(n_process_x2, n_process_y2,grid_size);
+
+    // The expected grid after reorganization
+    int expected_grid2[25] = {1, 0, 0, 1, 0,  
+                            0, 0, 1, 0, 0, 
+                            1, 1, 0, 0, 0,  
+                            0, 0, 0, 0, 0,  
+                            0, 0, 0, 0, 0};
+    
+
+    int* grid_ptr2 = grid_actual2.getGrid();
+    for (int i = 0; i < grid_size*grid_size; i++){
+        bool isCorrect = grid_ptr2[i] == expected_grid2[i];
+        ASSERT_TRUE(isCorrect)<< "Mismatch at row " << i/grid_size << " and column " << i%grid_size;
+    }
+    
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+TEST(GridTest, InverseReorganizingGrid){
+
+    // Writing a test for the reorganizeGrid function
+
+    int grid_size = 5;
+    int n_process_x = 3;  // Number of processes in the vertical direction
+    int n_process_y = 1;  // Number of processes in the horizontal direction
+
+    // example grid to be reorganized
+    // The expected grid after reorganization
+    int actual_grid[25] = {1, 0, 0, 0, 0,  // This row is sent to process 0
+                            0, 1, 1, 0, 0,  // This row is sent to process 1
+                            1, 1, 0, 0, 0,  // This row and all above are sent to process 2
+                            0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0};
+
+
+    // Initialize the grid with the example grid
+    Grid grid_actual(grid_size, grid_size, 42);
+    grid_actual.setGrid(actual_grid); 
+
+    // Reorganize the grid
+    grid_actual.inverseReorganizeGrid(n_process_x, n_process_y,grid_size);
+
+    int expected_grid[25] = {1, 0, 0, 0, 0,
+                            0, 1, 1, 0, 0,
+                            1, 1, 0, 0, 0,
+                            0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0};
+                            
+    
+
+    int* grid_ptr = grid_actual.getGrid();
+    for (int i = 0; i < grid_size*grid_size; i++){
+        bool isCorrect = grid_ptr[i] == expected_grid[i];
+        ASSERT_TRUE(isCorrect)<< "Mismatch at row " << i/grid_size << " and column " << i%grid_size;
+    }
+
+
+    int n_process_x2 = 2;  // Number of processes in the vertical direction
+    int n_process_y2 = 2;  // Number of processes in the horizontal direction
+    // example grid to be reorganized
+
+    int actual_grid2[25] = {1, 0, 0, 1, 0,  
+                            0, 0, 1, 0, 0, 
+                            1, 1, 0, 0, 0,  
+                            0, 0, 0, 0, 0,  
+                            0, 0, 0, 0, 0};
+    Grid grid_actual2(grid_size, grid_size, 42);
+    grid_actual2.setGrid(actual_grid2);
+
+    // Reorganize the grid
+    grid_actual2.inverseReorganizeGrid(n_process_x2, n_process_y2, grid_size);
+
+    // The expected grid after reorganization
+
+    int expected_grid2[25] = {1, 0, 0, 0, 0,
+                        0, 1, 1, 0, 0,
+                        1, 1, 0, 0, 0,
+                        0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0};
+    
+    
+
+    int* grid_ptr2 = grid_actual2.getGrid();
+    for (int i = 0; i < grid_size*grid_size; i++){
+        bool isCorrect = grid_ptr2[i] == expected_grid2[i];
+        ASSERT_TRUE(isCorrect)<< "Mismatch at row " << i/grid_size << " and column " << i%grid_size;
+    }
+    
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+TEST(GridTest, VerticalPadding){
+
+    // Writing a test for the AddVerticalPadding() function
+
+    int actual_grid[25] = {1, 0, 0, 0, 0, 
+                        0, 1, 1, 0, 0,  
+                        1, 1, 0, 0, 0,  
+                        0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0};
+    
+    Grid grid_actual(5, 5, 42);
+    grid_actual.setGrid(actual_grid);
+
+    // Add vertical padding to the grid
+    grid_actual.AddVerticalPadding();
+
+    // The expected grid after adding vertical padding
+
+    int expected_grid[35] = {0, 0, 0, 0, 0,
+                    1, 0, 0, 0, 0, 
+                    0, 1, 1, 0, 0,  
+                    1, 1, 0, 0, 0,  
+                    0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0};
+    
+    int* grid_ptr = grid_actual.getGrid();
+    for (int i = 0; i < 30; i++){
+        bool isCorrect = grid_ptr[i] == expected_grid[i];
+        ASSERT_TRUE(isCorrect)<< "Mismatch at row " << i/7 << " and column " << i%5;
+    }
+
+        
+}
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+TEST(GridTest, HorizontalPadding){
+
+
+    // Writing a test for the AddHorizontalPadding() function
+
+    int actual_grid[25] = {1, 0, 0, 0, 0, 
+                        0, 1, 1, 0, 0,  
+                        1, 1, 0, 0, 0,  
+                        0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0};
+
+    Grid grid_actual(5, 5, 42);
+    grid_actual.setGrid(actual_grid);
+
+    // Add horizontal padding to the grid
+    grid_actual.AddHorizontalPadding();
+
+    // The expected grid after adding horizontal padding
+
+    int expected_grid[35] = {0, 1, 0, 0, 0, 0, 0,
+                            0, 0, 1, 1, 0, 0, 0, 
+                            0, 1, 1, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0, 0, 0};
+    
+    int* grid_ptr = grid_actual.getGrid();
+    for (int i = 0; i < 35; i++){
+        bool isCorrect = grid_ptr[i] == expected_grid[i];
+        ASSERT_TRUE(isCorrect)<< "Mismatch at row " << i/5 << " and column " << i%7;
+    }
+
+}
+
