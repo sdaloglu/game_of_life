@@ -61,4 +61,3 @@ Grid readGridFromFile(const std::string &filename) {
 
   return grid;
 }
-
