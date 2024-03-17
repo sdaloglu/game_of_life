@@ -25,6 +25,9 @@ public:
   // Alternatively user can provide an initial grid
   void setGrid(const int *initialGrid); // User input is a 2D array
 
+  // Function to get the size of the grid
+  int getSize() const;
+
   // Updating function for the grid by using classical counting of live
   void updateGridCounting();
 
@@ -39,28 +42,28 @@ public:
 
   // Define a function to reorganize 1D grid so that each chunk to be scattered
   // is contiguous in memory
-  void reorganizeGrid(int n_process_x, int n_process_y);
+  void reorganizeGrid(int n_process_x, int n_process_y, int grid_size);
 
   // Reversing the reorganization of the grid
-  void inverseReorganizeGrid(int n_process_x, int n_process_y);
+  void inverseReorganizeGrid(int n_process_x, int n_process_y, int grid_size);
 
   // vertical padding function used in MPI
-  void AddVerticalPadding(int process_cols, int process_rows);
+  void AddVerticalPadding();
 
   // vertical halo exchange function used in MPI
   void VerticalHaloExchange(int rank, int nranks, MPI_Comm comm);
 
   // Horizontal padding function used in MPI
-  void AddHorizontalPadding(int process_cols, int process_rows);
+  void AddHorizontalPadding();
 
   // horizontal halo exchange function used in MPI
   void HorizontalHaloExchange(int rank, int nranks, MPI_Comm comm);
 
   // vertical convolution function used in MPI
-  void VerticalConv(int process_cols, int process_rows);
+  void VerticalConv();
 
   // horizontal convolution function used in MPI
-  void HorizontalConv(int process_cols, int process_rows);
+  void HorizontalConv();
 
   // Game of life rules
   void ApplyGameRules(const Grid &conv_grid);
