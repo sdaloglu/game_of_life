@@ -1,0 +1,6 @@
+MPI Processes: 1, OpenMP Threads: 76, Time: 19.590803623199463 seconds
+MPI Processes: 2, OpenMP Threads: 38, Time: 10.86510443687439 seconds
+MPI Processes: 4, OpenMP Threads: 19, Time: 4.931676864624023 seconds
+MPI Processes: 19, OpenMP Threads: 4, Time: 2.9708895683288574 seconds
+MPI Processes: 38, OpenMP Threads: 2, Time: 3.242830753326416 seconds
+MPI Processes: 76, OpenMP Threads: 1, Time: 3.047403335571289 seconds
