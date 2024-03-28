@@ -18,8 +18,8 @@ build:
 # This step prepares the project for compilation.
 	@echo "Building CMake Projectcs for both debug and release ..."
 	@echo "Specify which sub-build directory to use for compilation "
-	cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE="-O3" 
-	cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS_DEBUG="-g -O2"
+	cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE="-O3" -DCMAKE_CXX_COMPILER=mpicxx
+	cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS_DEBUG="-g -O2" -DCMAKE_CXX_COMPILER=mpicxx
 	cmake -S . -B build/docs
 	cmake -S . -B build/test
 	@echo "Done!"
