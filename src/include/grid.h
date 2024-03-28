@@ -35,13 +35,7 @@ public:
   int getSize() const;
 
   // Updating function for the grid by using classical counting of live
-  void updateGridCounting();
-
-  // Padding function for the grid so that it can be divided into equal chunks
-  void padding(int new_size1, int new_size2);
-
-  // Unpadding function to remove the padding at the end of the simulation
-  void unpadGrid(int grid_size);
+  void updateGrid();
 
   // Printing function for the grid
   void printGrid();
