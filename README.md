@@ -125,7 +125,7 @@ ChatGPT 3.5 was used for suggesting alternative wordings, grammar suggestions, a
 How can I write this equation in LaTeX format? <input equation>
 ```
 ```
-Provide BibTex citation format for this website textit <input website>
+Provide BibTex citation format for this website <input website>
 ```
 ```
 What is the rule of 5 in C++ and how important it is in class definitions?
