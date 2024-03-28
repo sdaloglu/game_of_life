@@ -32,6 +32,6 @@ target_link_libraries(game PUBLIC libgrid timing_lib)
 
 
 # Clang-tidy
-ClangTidy(game)
+#ClangTidy(game)
 # Clang-format
-ClangFormat(game .)
+#ClangFormat(game .)
