@@ -67,6 +67,10 @@ TEST(GridTests, IndexOperator){
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Test for the updateGrid function of the Grid class.
+ * 
+ */
 TEST(GridTests, UpdateGridCorrectly) {
 
     // Checking Still Lifes
@@ -79,7 +83,7 @@ TEST(GridTests, UpdateGridCorrectly) {
     Grid grid_block(5, 5, 42);
     grid_block.setGrid(block);
     for (int time=0; time < 30; time++){
-        grid_block.updateGridCounting();  // Update the grid 30 times
+        grid_block.updateGrid();  // Update the grid 30 times
     }
     int* block_ptr = grid_block.getGrid();
     for (int i = 0; i < 25; i++){
@@ -98,7 +102,7 @@ TEST(GridTests, UpdateGridCorrectly) {
     Grid grid_beehive(5, 5, 42);
     grid_beehive.setGrid(beehive);
     for (int time=0; time < 30; time++){
-        grid_beehive.updateGridCounting();  // Update the grid 30 times
+        grid_beehive.updateGrid();  // Update the grid 30 times
     }
     int* beehive_ptr = grid_beehive.getGrid();
     for (int i = 0; i < 25; i++){
@@ -117,7 +121,7 @@ TEST(GridTests, UpdateGridCorrectly) {
     Grid grid_loaf(6, 6, 42);
     grid_loaf.setGrid(loaf);
     for (int time=0; time < 30; time++){
-        grid_loaf.updateGridCounting();  // Update the grid 30 times
+        grid_loaf.updateGrid();  // Update the grid 30 times
     }
     int* loaf_ptr = grid_loaf.getGrid();
     for (int i = 0; i < 36; i++){
@@ -135,7 +139,7 @@ TEST(GridTests, UpdateGridCorrectly) {
     Grid grid_boat(5, 5, 42);
     grid_boat.setGrid(boat);
     for (int time=0; time < 30; time++){
-        grid_boat.updateGridCounting();  // Update the grid 30 times
+        grid_boat.updateGrid();  // Update the grid 30 times
     }
     int* boat_ptr = grid_boat.getGrid();
     for (int i = 0; i < 25; i++){
@@ -152,7 +156,7 @@ TEST(GridTests, UpdateGridCorrectly) {
     Grid grid_tub(5, 5, 42);
     grid_tub.setGrid(tub);
     for (int time=0; time < 30; time++){
-        grid_tub.updateGridCounting();  // Update the grid 30 times
+        grid_tub.updateGrid();  // Update the grid 30 times
     }
     int* tub_ptr = grid_tub.getGrid();
     for (int i = 0; i < 25; i++){
@@ -177,7 +181,7 @@ TEST(GridTests, UpdateGridCorrectly) {
     Grid grid_blinker(5, 4, 42);
     grid_blinker.setGrid(blinker1);
     for (int time=0; time < 15; time++){
-        grid_blinker.updateGridCounting();  // Update the grid 30 times
+        grid_blinker.updateGrid();  // Update the grid 30 times
     }
     int* blinker_ptr = grid_blinker.getGrid();
     for (int i = 0; i < 20; i++){
@@ -187,7 +191,7 @@ TEST(GridTests, UpdateGridCorrectly) {
     }
 
     // Update the blinker one more time to check if it returns to the original state
-    grid_blinker.updateGridCounting();
+    grid_blinker.updateGrid();
     int* blinker_ptr2 = grid_blinker.getGrid();
     for (int i = 0; i < 20; i++){
         bool isCorrect = blinker1[i] == blinker_ptr2[i];
@@ -205,7 +209,10 @@ TEST(GridTests, UpdateGridCorrectly) {
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-
+/**
+ * @brief Test for the printGrid function of the Grid class.
+ * 
+ */
 TEST(GridTests, PrintGrid){
 
     // Example grid to be printed
@@ -238,6 +245,10 @@ TEST(GridTests, PrintGrid){
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Test for the reorganizeGrid function of the Grid class.
+ * 
+ */
 TEST(GridTest, ReorganizingGrid){
 
     // Writing a test for the reorganizeGrid function
@@ -308,9 +319,13 @@ TEST(GridTest, ReorganizingGrid){
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Test for the inverseReorganizeGrid function of the Grid class.
+ * 
+ */
 TEST(GridTest, InverseReorganizingGrid){
 
-    // Writing a test for the reorganizeGrid function
+    // Writing a test for inversing the organized grid, inverseReorganizeGrid function
 
     int grid_size = 5;
     int n_process_x = 3;  // Number of processes in the vertical direction
@@ -384,6 +399,10 @@ TEST(GridTest, InverseReorganizingGrid){
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Test for the AddVerticalPadding function of the Grid class.
+ * 
+ */
 TEST(GridTest, VerticalPadding){
 
     // Writing a test for the AddVerticalPadding() function
@@ -422,6 +441,10 @@ TEST(GridTest, VerticalPadding){
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Test for the AddHorizontalPadding function of the Grid class.
+ * 
+ */
 TEST(GridTest, HorizontalPadding){
 
 
