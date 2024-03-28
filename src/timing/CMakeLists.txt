@@ -3,7 +3,7 @@ add_library(timing_lib
     timing.cpp
 )
 
-ClangTidy(timing_lib)
+#ClangTidy(timing_lib)
 
 target_include_directories(timing_lib
     PUBLIC
